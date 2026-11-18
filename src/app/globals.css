@@ -1,22 +1,28 @@
 @import "tailwindcss";
 
+/* Late-night club: smoke, brass, cream paper. No literal instruments. */
 :root {
   color-scheme: dark;
-  --background: #09090b;
-  --foreground: #f4f4f5;
-  --muted: #a1a1aa;
-  --subtle: #71717a;
-  --card: #111114;
-  --card-hover: #16161b;
-  --border: #27272a;
-  --border-strong: #3f3f46;
-  --accent: #c4b5fd;
-  --accent-soft: rgba(196, 181, 253, 0.12);
-  --success: #86efac;
-  --warning: #fde68a;
-  --danger: #fca5a5;
-  --ring: rgba(196, 181, 253, 0.35);
-  --radius: 1rem;
+  --background: #0c0a08;
+  --background-mid: #15120e;
+  --background-end: #1c1814;
+  --foreground: #f3ead7;
+  --muted: #c4b49a;
+  --subtle: #8a7b66;
+  --card: #16110d;
+  --card-hover: #1c1611;
+  --border: #2a221a;
+  --border-strong: #4a3b2a;
+  --accent: #d4a04a;
+  --accent-soft: rgba(212, 160, 74, 0.14);
+  --brass: #e0b35c;
+  --ember: #b54a2e;
+  --smoke: rgba(243, 234, 215, 0.04);
+  --success: #9aaf7c;
+  --warning: #d4a04a;
+  --danger: #c46b5a;
+  --ring: rgba(212, 160, 74, 0.4);
+  --radius: 0.35rem;
 }
 
 @theme inline {
@@ -30,11 +36,14 @@
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-brass: var(--brass);
+  --color-ember: var(--ember);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
 }
 
 * {
@@ -43,17 +52,38 @@
 
 html {
   scroll-behavior: smooth;
+  /* Never lock to viewport height — that clips page backgrounds mid-scroll. */
+  height: auto;
+  background-color: var(--background);
 }
 
 body {
+  position: relative;
+  isolation: isolate;
+  height: auto;
   min-height: 100vh;
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(196, 181, 253, 0.08), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgba(125, 211, 252, 0.05), transparent 45%),
-    var(--background);
+  margin: 0;
+  /* Solid fallback only; the real fill is ::before spanning the full body box. */
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   text-rendering: optimizeLegibility;
+  letter-spacing: 0.01em;
+}
+
+/* One continuous gradient tied to the full document height (not the viewport). */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    var(--background) 0%,
+    var(--background-mid) 52%,
+    var(--background-end) 100%
+  );
 }
 
 a {
@@ -62,28 +92,45 @@ a {
 }
 
 ::selection {
-  background: var(--accent-soft);
+  background: rgba(212, 160, 74, 0.28);
   color: var(--foreground);
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 3px;
 }
 
 .container-page {
-  width: min(100% - 2rem, 72rem);
+  width: min(100% - 2rem, 68rem);
   margin-inline: auto;
 }
 
 .surface {
-  background: color-mix(in srgb, var(--card) 88%, transparent);
+  background: color-mix(in srgb, var(--card) 92%, #000 8%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(243, 234, 215, 0.03);
 }
 
 .prose-muted {
   color: var(--muted);
-  line-height: 1.7;
+  line-height: 1.75;
+}
+
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.rule {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    transparent
+  );
 }

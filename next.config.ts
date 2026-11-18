@@ -7,10 +7,19 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Hide the Next.js "N" dev overlay (routes / bundler prefs).
+  devIndicators: false,
   // Enables the slim runtime used by Dockerfile multi-stage builds.
   output: "standalone",
   images: {
     formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "i.ytimg.com",
+        pathname: "/vi/**",
+      },
+    ],
   },
   turbopack: {
     // Keep resolution inside this repo even if a parent lockfile exists.

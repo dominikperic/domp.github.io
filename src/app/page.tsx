@@ -1,10 +1,9 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { FadeIn } from "@/components/ui";
 import { PageShell } from "@/components/PageShell";
-import { ProjectCard } from "@/components/ProjectCard";
-import { projects } from "@/content/projects";
-import { siteConfig } from "@/content/site";
+import { likesContent } from "@/content/likes";
+import { identityContent, siteConfig } from "@/content/site";
 import { createMetadata } from "@/lib/seo";
 
 export const metadata = createMetadata({
@@ -13,85 +12,108 @@ export const metadata = createMetadata({
   path: "/",
 });
 
-const featured = projects.filter((project) => project.featured).slice(0, 2);
-
 export default function HomePage() {
   return (
-    <PageShell>
-      <FadeIn>
-        <section className="grid gap-10 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
-          <div className="max-w-2xl">
-            <p className="mb-4 text-xs font-medium uppercase tracking-[0.2em] text-accent">
-              Personal site
-            </p>
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              {siteConfig.name}
-            </h1>
-            <p className="mt-5 text-xl leading-relaxed text-muted sm:text-2xl">
-              {siteConfig.tagline}
-            </p>
-            <p className="prose-muted mt-6 max-w-xl text-base sm:text-lg">{siteConfig.summary}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/projects"
-                className="inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background transition hover:opacity-90"
-              >
-                View projects
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/building"
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm text-foreground transition hover:border-border-strong"
-              >
-                Currently building
-              </Link>
-              <Link
-                href="/contact"
-                className="inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2.5 text-sm text-muted transition hover:text-accent"
-              >
-                Contact
-              </Link>
+    <PageShell className="pt-6 pb-12 sm:pt-8 sm:pb-16">
+      {/* One shared column; modest left bias (~28% of free space) instead of pure center */}
+      <div className="mr-auto ml-[max(0rem,calc((100%-42rem)*0.28))] w-full max-w-2xl">
+        <FadeIn className="pt-2 pb-10 sm:pt-3 sm:pb-12">
+          <h1 className="font-display text-5xl leading-[1.05] text-foreground sm:text-6xl">
+            {siteConfig.name}
+          </h1>
+
+          <div className="rule my-8 max-w-[12rem]" />
+
+          <p className="prose-muted max-w-xl text-[15px]">{siteConfig.summary}</p>
+        </FadeIn>
+
+        <section
+          id="identity"
+          className="border-t border-border/80 pt-12 pb-4 sm:pt-14"
+          aria-labelledby="identity-heading"
+        >
+          <FadeIn delay={0.03}>
+            <h2
+              id="identity-heading"
+              className="font-display text-3xl leading-tight text-foreground sm:text-4xl"
+            >
+              {identityContent.title}
+            </h2>
+            <div className="mt-4 max-w-xl space-y-4">
+              {identityContent.paragraphs.map((paragraph, paragraphIndex) => (
+                <p key={paragraphIndex} className="prose-muted text-[15px]">
+                  {paragraph.map((segment, segmentIndex) =>
+                    segment.href ? (
+                      <Link
+                        key={`${paragraphIndex}-${segmentIndex}`}
+                        href={segment.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="!font-medium !text-accent transition-colors hover:!text-brass"
+                      >
+                        {segment.text}
+                      </Link>
+                    ) : (
+                      <span key={`${paragraphIndex}-${segmentIndex}`}>{segment.text}</span>
+                    ),
+                  )}
+                </p>
+              ))}
             </div>
-          </div>
-
-          <aside className="surface p-5 sm:p-6">
-            <p className="text-xs uppercase tracking-[0.16em] text-subtle">At a glance</p>
-            <dl className="mt-4 space-y-4 text-sm">
-              <div>
-                <dt className="text-subtle">Education</dt>
-                <dd className="mt-1 text-foreground">Georgia Tech · Computer Science</dd>
-              </div>
-              <div>
-                <dt className="text-subtle">Focus</dt>
-                <dd className="mt-1 text-foreground">
-                  Software engineering, data engineering, ML / AI
-                </dd>
-              </div>
-              <div>
-                <dt className="text-subtle">Status</dt>
-                <dd className="mt-1 text-foreground">{siteConfig.availability}</dd>
-              </div>
-            </dl>
-          </aside>
+          </FadeIn>
         </section>
-      </FadeIn>
 
-      <FadeIn delay={0.08} className="mt-16">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-accent">Selected work</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">Featured projects</h2>
-          </div>
-          <Link href="/projects" className="text-sm text-muted transition hover:text-accent">
-            All projects →
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {featured.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      </FadeIn>
+        <section
+          id="likes"
+          className="mt-6 border-t border-border/80 pt-16 pb-10 sm:pt-20"
+          aria-labelledby="likes-heading"
+        >
+          <FadeIn delay={0.04}>
+            <h2
+              id="likes-heading"
+              className="font-display text-3xl leading-tight text-foreground sm:text-4xl"
+            >
+              {likesContent.title}
+            </h2>
+            <p className="prose-muted mt-4 max-w-lg text-[15px]">{likesContent.intro}</p>
+            <div className="rule mt-8 max-w-[8rem]" />
+          </FadeIn>
+
+          <FadeIn delay={0.08} className="mt-12">
+            <ul className="space-y-6">
+              {likesContent.items.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex gap-4 rounded-sm border border-border/80 bg-card/40 p-3 transition hover:border-border-strong hover:bg-card sm:gap-5 sm:p-4"
+                  >
+                    <div className="relative h-20 w-[7.5rem] shrink-0 overflow-hidden border border-border bg-background sm:h-24 sm:w-40">
+                      <Image
+                        src={item.imageSrc}
+                        alt={item.imageAlt}
+                        fill
+                        sizes="160px"
+                        className="object-cover opacity-90 transition group-hover:opacity-100"
+                      />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col justify-center">
+                      <p className="font-display text-xl text-foreground transition group-hover:text-accent">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-sm text-muted">{item.creator}</p>
+                      <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-subtle transition group-hover:text-accent">
+                        Watch on YouTube
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </FadeIn>
+        </section>
+      </div>
     </PageShell>
   );
 }
