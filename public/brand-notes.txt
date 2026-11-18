@@ -1,0 +1,4 @@
+# Placeholder brand assets
+#
+# Replace src/app/favicon.ico with your own favicon.
+# Optional: add public/og.png (1200x630) and reference it from src/lib/seo.ts later.
