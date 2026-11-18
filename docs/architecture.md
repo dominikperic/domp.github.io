@@ -32,7 +32,7 @@ Portfolio facts live in typed TypeScript modules under `src/content/`:
 
 | Module         | Responsibility                        |
 | -------------- | ------------------------------------- |
-| `site.ts`       | identity, nav, social links, site URL |
+| `site.ts`      | identity, nav, social links, site URL |
 | `projects.ts`  | project cards and statuses            |
 | `building.ts`  | active work / experiments             |
 | `interests.ts` | non-code interests                    |
