@@ -18,9 +18,7 @@ export function ProjectCard({ project }: { project: Project }) {
     <Card className="flex h-full flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-medium tracking-tight text-foreground">
-            {project.title}
-          </h3>
+          <h3 className="text-lg font-medium tracking-tight text-foreground">{project.title}</h3>
           <p className={cx("mt-1 text-xs uppercase tracking-wide", statusTone[project.status])}>
             {projectStatusLabel[project.status]}
           </p>

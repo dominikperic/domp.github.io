@@ -1,0 +1,21 @@
+# Ignore files that bloat the Docker build context.
+Dockerfile
+docker-compose.yml
+.dockerignore
+.git
+.github
+.next
+node_modules
+npm-debug.log*
+README.md
+CONTRIBUTING.md
+docs
+LICENSE
+Makefile
+*.md
+.env*
+!.env.example
+coverage
+.turbo
+.vscode
+.idea

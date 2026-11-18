@@ -25,13 +25,7 @@ export function FadeIn({
   );
 }
 
-export function Card({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cx(

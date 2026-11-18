@@ -26,7 +26,6 @@ export const siteConfig = {
 
 export const navigation: NavItem[] = [
   { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
   { label: "Projects", href: "/projects" },
   { label: "Building", href: "/building" },
   { label: "Interests", href: "/interests" },
@@ -45,12 +44,12 @@ export const socialLinks: SocialLink[] = [
   },
   {
     label: "LinkedIn",
-    href: "https://www.linkedin.com/in/REPLACE_WITH_YOUR_LINKEDIN",
+    href: "https://www.linkedin.com/in/dominik-peric-",
     external: true,
   },
   {
     label: "Email",
-    href: "mailto:REPLACE_WITH_YOUR_EMAIL@example.com",
+    href: "mailto:dominikperic3@gmail.com",
     external: true,
   },
 ];

@@ -28,9 +28,7 @@ export default function ContactPage() {
             <Link
               href={link.href}
               className="flex items-start justify-between gap-4"
-              {...(link.external
-                ? { target: "_blank", rel: "noopener noreferrer" }
-                : {})}
+              {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             >
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-subtle">Channel</p>

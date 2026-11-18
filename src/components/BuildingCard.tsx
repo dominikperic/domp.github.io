@@ -10,9 +10,7 @@ export function BuildingCard({ item }: { item: BuildingItem }) {
         <p className="text-xs uppercase tracking-[0.16em] text-accent">
           {buildingStatusLabel[item.status]}
         </p>
-        {item.updatedLabel ? (
-          <p className="text-xs text-subtle">{item.updatedLabel}</p>
-        ) : null}
+        {item.updatedLabel ? <p className="text-xs text-subtle">{item.updatedLabel}</p> : null}
       </div>
       <h3 className="text-lg font-medium tracking-tight">{item.title}</h3>
       <p className="prose-muted text-sm">{item.summary}</p>

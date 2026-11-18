@@ -15,8 +15,8 @@ export default function NotFound() {
         <p className="text-xs uppercase tracking-[0.18em] text-accent">404</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">Page not found</h1>
         <p className="prose-muted mt-4">
-          That route doesn&apos;t exist yet. Head home or browse projects while the site continues to
-          grow.
+          That route doesn&apos;t exist yet. Head home or browse projects while the site continues
+          to grow.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
