@@ -20,8 +20,7 @@ export const projects: Project[] = [
   {
     id: "personal-site",
     title: "Personal portfolio site",
-    summary:
-      "This website: a modular Next.js foundation for projects, writing, and experiments.",
+    summary: "This website: a modular Next.js foundation for projects, writing, and experiments.",
     description:
       "A dark, minimal personal site built to separate content from presentation so new projects and sections can be added without rewriting the UI layer.",
     technologies: ["Next.js", "TypeScript", "Tailwind CSS", "Framer Motion"],
@@ -37,8 +36,7 @@ export const projects: Project[] = [
   {
     id: "placeholder-systems-project",
     title: "Systems / tooling project (placeholder)",
-    summary:
-      "Reserved slot for a completed systems, tooling, or infrastructure project.",
+    summary: "Reserved slot for a completed systems, tooling, or infrastructure project.",
     description:
       "Replace this card with a real project once you're ready. Include the problem, approach, tech stack, and links.",
     technologies: ["TypeScript", "Python"],
@@ -48,8 +46,7 @@ export const projects: Project[] = [
   {
     id: "placeholder-ml-project",
     title: "ML / data project (placeholder)",
-    summary:
-      "Reserved slot for a machine learning, data engineering, or analytics project.",
+    summary: "Reserved slot for a machine learning, data engineering, or analytics project.",
     description:
       "Use this structure for model work, pipeline design, evaluation notes, and dataset constraints without overstating results.",
     technologies: ["Python", "SQL", "PyTorch"],

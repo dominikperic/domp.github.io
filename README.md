@@ -2,87 +2,88 @@
 
 Dark, minimal personal portfolio foundation built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Framer Motion**, and **Lucide React**.
 
-Live intent: a durable home for background, projects, active experiments, interests, and contact links — optimized for Vercel and a future custom domain.
+This repo is structured like a real software project: typed content modules, reusable UI, CI quality gates, Docker packaging, and docs — without turning into a heavy Jekyll/theme monorepo.
 
 ## Quick start
 
 ```bash
 npm install
 npm run dev
+# or
+make install && make dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Scripts
+### Quality scripts
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Local development server |
-| `npm run build` | Production build + sitemap generation |
-| `npm run start` | Serve the production build |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | TypeScript (`tsc --noEmit`) |
+| Command                           | Purpose                                         |
+| --------------------------------- | ----------------------------------------------- |
+| `npm run dev`                     | Local development server                        |
+| `npm run build`                   | Production build + sitemap generation           |
+| `npm run start`                   | Serve the production build                      |
+| `npm run lint`                    | ESLint                                          |
+| `npm run typecheck`               | TypeScript (`tsc --noEmit`)                     |
+| `npm run format` / `format:check` | Prettier write / check                          |
+| `npm run ci`                      | Format + lint + types + build (local CI parity) |
+| `make help`                       | All Makefile targets                            |
 
-## Project structure
+## Repository structure
 
 ```text
-src/
-  app/                 # App Router pages and metadata
-  components/          # Shared UI (nav, cards, layout primitives)
-  content/             # Typed editable content (no UI logic)
-  lib/                 # SEO helpers and utilities
-public/                # Static assets; robots/sitemap after build
+.
+├── .github/workflows/ci.yml   # GitHub Actions: quality + docker build
+├── Dockerfile                 # multi-stage production image
+├── docker-compose.yml         # containerized local dev
+├── Makefile                   # common developer commands
+├── CONTRIBUTING.md
+├── docs/
+│   ├── architecture.md
+│   └── deployment.md
+├── public/                    # static assets; sitemap/robots after build
+└── src/
+    ├── app/                   # routes + global styles
+    ├── components/            # reusable UI
+    ├── content/               # typed editable portfolio data
+    └── lib/                   # SEO + utilities
 ```
 
 ### Content editing
 
-Update portfolio copy without touching components:
-
-| File | Edits |
-| --- | --- |
-| `src/content/site.ts` | Name, tagline, nav, social links, site URL |
-| `src/content/about.ts` | About copy, focus areas, timeline |
-| `src/content/projects.ts` | Project cards, statuses, links |
-| `src/content/building.ts` | Currently-building items |
-| `src/content/interests.ts` | Interests grid |
-
-Replace placeholders marked clearly in those files (LinkedIn URL, email, empty project slots, hobby placeholders).
+| File                       | Edits                                      |
+| -------------------------- | ------------------------------------------ |
+| `src/content/site.ts`      | Name, tagline, nav, social links, site URL |
+| `src/content/about.ts`     | About copy, focus areas, timeline          |
+| `src/content/projects.ts`  | Project cards, statuses, links             |
+| `src/content/building.ts`  | Currently-building items                   |
+| `src/content/interests.ts` | Interests grid                             |
 
 ### Design system
 
-CSS variables live in `src/app/globals.css`:
+Tokens live in `src/app/globals.css` (dark surfaces, muted text, accent, shared layout utilities).
 
-- dark background / foreground
-- muted text, borders, card surfaces
-- accent violet for highlights
-- shared `.container-page` and `.surface` utilities
+## Docker
 
-## Deployment (Vercel)
+```bash
+# production-style image
+make docker-build
+docker run --rm -p 3000:3000 domp-site:local
 
-1. Push this repository to GitHub (`dominikperic/domp.github.io`).
-2. Import the repo in [Vercel](https://vercel.com/new).
-3. Framework preset: **Next.js** (default).
-4. Optional environment variable:
-   - `NEXT_PUBLIC_SITE_URL=https://your-domain.com`  
-     Used for canonical URLs, Open Graph, and `next-sitemap`.
-5. Deploy. Attach a custom domain later in Vercel project settings.
+# compose dev (hot reload via bind mount)
+make docker-up
+```
 
-### GitHub Pages note
+## Deployment
 
-The repo name is `domp.github.io`, but this foundation targets **Vercel** for Next.js App Router hosting. Static GitHub Pages would need `output: "export"` and would drop some Next server features.
+See [docs/deployment.md](docs/deployment.md). Short version: import the GitHub repo in **Vercel**, set optional `NEXT_PUBLIC_SITE_URL`, deploy from reviewed `main`.
 
-## SEO and assets
+## Engineering notes
 
-- Metadata + Open Graph helpers: `src/lib/seo.ts`
-- Favicon: `src/app/favicon.ico` (replace with your own mark)
-- Sitemap + robots: generated on `postbuild` via `next-sitemap`
-- Custom 404: `src/app/not-found.tsx`
-
-## Safety
-
-- Do not commit secrets, tokens, or private details you do not want public.
-- Social links and email in `site.ts` become public once deployed.
+- CI runs on PRs/pushes: Prettier, ESLint, TypeScript, production build, Docker image build.
+- `output: "standalone"` supports the Docker runtime.
+- Content is separated from presentation on purpose so the site can grow without rewrites.
+- Reference sites (for example polished Jekyll portfolios with Docker/CI) informed the **process**, not a literal folder copy.
 
 ## Status
 
-This is a **production-ready foundation**, not a finished autobiography. Architecture, navigation, design tokens, pages, and content modules are in place so the site can grow continuously.
+Production-ready **foundation**. Architecture, pages, content modules, CI/Docker, and docs are in place so the portfolio can expand continuously.

@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+build
+coverage
+package-lock.json
+public/sitemap*.xml
+public/robots.txt
+*.tsbuildinfo

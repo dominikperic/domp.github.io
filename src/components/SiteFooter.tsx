@@ -17,9 +17,7 @@ export function SiteFooter() {
               key={link.label}
               href={link.href}
               className="transition-colors hover:text-accent"
-              {...(link.external
-                ? { target: "_blank", rel: "noopener noreferrer" }
-                : {})}
+              {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             >
               {link.label}
             </Link>

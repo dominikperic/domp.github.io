@@ -59,9 +59,7 @@ export default function AboutPage() {
             <Card key={item.title} className="grid gap-2 sm:grid-cols-[8rem_1fr]">
               <div>
                 <p className="text-xs uppercase tracking-[0.14em] text-subtle">{item.label}</p>
-                {item.period ? (
-                  <p className="mt-1 text-sm text-muted">{item.period}</p>
-                ) : null}
+                {item.period ? <p className="mt-1 text-sm text-muted">{item.period}</p> : null}
               </div>
               <div>
                 <h3 className="font-medium text-foreground">{item.title}</h3>
