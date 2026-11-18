@@ -53,7 +53,6 @@ Open [http://localhost:3000](http://localhost:3000).
 | File                       | Edits                                      |
 | -------------------------- | ------------------------------------------ |
 | `src/content/site.ts`      | Name, tagline, nav, social links, site URL |
-| `src/content/about.ts`     | About copy, focus areas, timeline          |
 | `src/content/projects.ts`  | Project cards, statuses, links             |
 | `src/content/building.ts`  | Currently-building items                   |
 | `src/content/interests.ts` | Interests grid                             |

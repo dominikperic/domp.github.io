@@ -46,10 +46,10 @@ export default function HomePage() {
                 Currently building
               </Link>
               <Link
-                href="/about"
+                href="/contact"
                 className="inline-flex items-center gap-2 rounded-full border border-transparent px-4 py-2.5 text-sm text-muted transition hover:text-accent"
               >
-                About me
+                Contact
               </Link>
             </div>
           </div>
