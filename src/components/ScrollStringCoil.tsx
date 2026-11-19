@@ -11,14 +11,14 @@ import {
 
 /** Classic six guitar strings, equal spacing across the group. */
 const STRING_COUNT = 6;
-const SAMPLE_COUNT = 96;
+const SAMPLE_COUNT = 128;
 /** container-page: width min(100% - 2rem, 68rem) — keep in sync with globals.css */
 const CONTAINER_MAX_PX = 68 * 16; // 68rem
 const CONTAINER_INLINE_GUTTER_PX = 32; // 2rem total
 /** After scroll stops, amplitude falls to zero over this many ms (quick log-like curve). */
-const VIBRATE_DECAY_MS = 1500;
-/** Lower visual oscillation rate (Hz) for flowing waves rather than strum blur. */
-const VIBRATE_HZ_BASE = 8;
+const VIBRATE_DECAY_MS = 2000;
+/** Human-readable snake crawl, not high-frequency string buzz. */
+const VIBRATE_HZ_BASE = 1.5;
 /**
  * Exponential decay steepness. Higher = faster early drop (log-like ring-out).
  * gain = (e^{-k u} - e^{-k}) / (1 - e^{-k}) with u = elapsed/T ∈ [0,1].
@@ -31,58 +31,28 @@ function rand(min: number, max: number) {
 
 /** Per-burst random recipe so each scroll wake-up looks different. */
 type BurstSeed = {
-  /** Spatial harmonic wavelength fractions of viewport height. */
-  len1: number;
-  len2: number;
-  len3: number;
-  /** Spatial phases / mix weights. */
-  p1: number;
-  p2: number;
-  p3: number;
-  w1: number;
-  w2: number;
-  w3: number;
-  /** Per-string spatial offset jitter. */
-  stringJitter: number[];
-  /** Fundamental-led temporal mix with weak, slowly beating secondary modes. */
+  /** Primary wavelength as a fraction of the viewport height. */
+  wavelength: number;
+  phase: number;
+  harmonicPhase: number;
+  harmonicWeight: number;
+  direction: -1 | 1;
+  /** Small shared phase step keeps neighboring strings parallel, never a helix. */
+  stringPhaseLag: number;
+  ampScale: number;
   hzScale: number;
-  tHz2: number;
-  tHz3: number;
-  tPhase2: number;
-  tPhase3: number;
-  tW1: number;
-  tW2: number;
-  tW3: number;
 };
 
 function freshBurstSeed(): BurstSeed {
-  // One broad streamline with small secondary bends, not several competing ripples.
-  // Positive weights sum to one so neither field needs hard clipping at its peaks.
-  const w1 = rand(0.1, 0.15);
-  const w2 = rand(0.03, 0.06);
-  const w3 = 1 - w1 - w2;
-  const tW1 = rand(0.86, 0.9);
-  const tW2 = rand(0.05, 0.08);
-  const tW3 = 1 - tW1 - tW2;
   return {
-    len1: rand(0.65, 0.85),
-    len2: rand(0.45, 0.6),
-    len3: rand(0.95, 1.35),
-    p1: rand(0, Math.PI * 2),
-    p2: rand(0, Math.PI * 2),
-    p3: rand(0, Math.PI * 2),
-    w1,
-    w2,
-    w3,
-    stringJitter: Array.from({ length: STRING_COUNT }, () => rand(-0.55, 0.55)),
-    hzScale: rand(0.75, 1.05),
-    tHz2: rand(1.05, 1.3),
-    tHz3: rand(0.35, 0.7),
-    tPhase2: rand(0, Math.PI * 2),
-    tPhase3: rand(0, Math.PI * 2),
-    tW1,
-    tW2,
-    tW3,
+    wavelength: rand(0.28, 0.55),
+    phase: rand(0, Math.PI * 2),
+    harmonicPhase: rand(0, Math.PI * 2),
+    harmonicWeight: rand(0.15, 0.35),
+    direction: Math.random() < 0.5 ? -1 : 1,
+    stringPhaseLag: rand(-0.035, 0.035),
+    ampScale: rand(0.85, 1),
+    hzScale: rand(0.7, 1.3),
   };
 }
 
@@ -137,30 +107,24 @@ function spatialRipple(
   seed: BurstSeed,
   phase = 0,
 ): number {
-  const k1 = (Math.PI * 2) / (height * seed.len1);
-  const k2 = (Math.PI * 2) / (height * seed.len2);
-  const k3 = (Math.PI * 2) / (height * seed.len3);
-  const j = seed.stringJitter[stringIndex] ?? 0;
-  const raw =
-    seed.w1 * temporalOsc(phase, seed, k1 * y + seed.p1 + j) +
-    seed.w2 * temporalOsc(phase, seed, k2 * y + seed.p2 + j * 1.3) +
-    seed.w3 * temporalOsc(phase, seed, k3 * y + seed.p3 + j * 0.7);
-  return raw;
-}
-
-/** Phase travels through each bend, rather than scaling a frozen spatial field. */
-function temporalOsc(phase: number, seed: BurstSeed, spatialPhase = 0): number {
-  const raw =
-    seed.tW1 * Math.sin(spatialPhase - phase) +
-    seed.tW2 * Math.sin(spatialPhase - phase * seed.tHz2 + seed.tPhase2) +
-    seed.tW3 * Math.sin(spatialPhase - phase * seed.tHz3 + seed.tPhase3);
-  return raw;
+  const k = (Math.PI * 2) / (height * seed.wavelength);
+  const bodyPhase =
+    k * y -
+    seed.direction * phase +
+    seed.phase +
+    (stringIndex - (STRING_COUNT - 1) / 2) * seed.stringPhaseLag;
+  // Both modes translate at the SAME speed: the body crawls intact along Y.
+  // Normalize instead of clipping so smooth S-bends stay within the old budget.
+  return (
+    (Math.sin(bodyPhase) + seed.harmonicWeight * Math.sin(2 * bodyPhase + seed.harmonicPhase)) /
+    (1 + seed.harmonicWeight)
+  );
 }
 
 /**
  * x = baseX + sin(πt)² * amp * gain * travelingRipple(y, phase, seed)
  * Every sine has zero temporal mean, so the body stays centered on baseX.
- * gain shrinks the swing to straight over 1.5s after scroll stops.
+ * gain shrinks the swing to straight over 2s after scroll stops.
  */
 function buildStringPath(
   baseX: number,
@@ -176,7 +140,7 @@ function buildStringPath(
     return `M ${baseX} 0 L ${baseX} ${height}`;
   }
 
-  const amp = amplitude * gain * (0.96 + (stringIndex % 3) * 0.02);
+  const amp = amplitude * gain * seed.ampScale;
 
   let d = "";
   for (let i = 0; i <= SAMPLE_COUNT; i++) {
@@ -201,7 +165,7 @@ export function ScrollStringCoil() {
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRefs = useRef<(SVGPathElement | null)[]>([]);
   const loopIdRef = useRef<number | null>(null);
-  /** performance.now() of last scroll — starts the 1.5s decay clock. */
+  /** performance.now() of last scroll — starts the 2s decay clock. */
   const lastScrollTimeRef = useRef(0);
   /** Radians; advances every frame while gain > 0. */
   const oscPhaseRef = useRef(0);
@@ -221,7 +185,7 @@ export function ScrollStringCoil() {
     };
 
     /**
-     * Swing amplitude: full while scrolling; after stop, exponential (quick) fall to 0 by 1.5s.
+     * Swing amplitude: full while scrolling; after stop, exponential fall to 0 by 2s.
      * Not linear — steep early drop like a plucked string ringing out.
      */
     const vibrateGain = (now: number): number => {
@@ -322,7 +286,8 @@ export function ScrollStringCoil() {
       // New random shape + timing each time vibration wakes from rest.
       if (wasResting) {
         seedRef.current = freshBurstSeed();
-        oscPhaseRef.current = rand(0, Math.PI * 2);
+        oscPhaseRef.current = 0;
+        lastFrameTimeRef.current = now;
       }
       notifyScrollAudio();
       ensureLoop();
