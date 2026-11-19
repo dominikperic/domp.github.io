@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Trace the logo-cleaned source at native resolution; never redraw facial geometry.
+
+Run: UV_CACHE_DIR=.portrait-work/uv-cache uv run --no-project \
+    --with pillow==13.0.0 --with opencv-python-headless==5.1.0.95 \
+    --with numpy==2.5.5 scripts/generate-portrait-strokes.py
+Dependencies can also be supplied by a local isolated environment.
+"""
+from pathlib import Path
+import hashlib
+import importlib.metadata
+import json
+import math
+import cv2
+import numpy as np
+from PIL import Image, ImageDraw
+
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / 'public/portraits/dominik-portrait-detailed.png'
+OUTPUT = ROOT / 'public/portraits/dominik-portrait-stroke-hd.svg'
+WORK = ROOT / '.portrait-work'
+
+
+def trace(image):
+    """One-pixel edge skeletons, split into genuine connected pen runs."""
+    rgba = np.asarray(image.convert('RGBA'))
+    alpha = rgba[:, :, 3]
+    print('source', image.size, 'alpha quantiles', np.percentile(alpha, [0, 25, 50, 75, 95, 100]))
+    # Composite luminance against black: RGB carries opaque interior pencil
+    # tones; alpha alone contains only the outer silhouette.
+    luminance = cv2.cvtColor(rgba[:, :, :3], cv2.COLOR_RGB2GRAY)
+    luminance = (luminance.astype(np.float32) * alpha / 255).astype(np.uint8)
+    # Native-scale Canny retains real eyelids, nostrils and individual curls.
+    # Suppress sub-pencil grain, not facial geometry. Edge-preserving smoothing
+    # avoids converting every skin pore into equally weighted contour noise.
+    luminance = cv2.bilateralFilter(luminance, 7, 24, 2)
+    edges = cv2.Canny(luminance, 28, 65, L2gradient=True)
+    ys, xs = np.nonzero(edges)
+    pixels = set(zip(xs.tolist(), ys.tolist()))
+    adjacent = {}
+    for x, y in pixels:
+        neighbors = []
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, -1), (-1, 1), (1, 1)):
+            p = (x + dx, y + dy)
+            # Avoid corner triangles that generate spurious tiny branch strokes.
+            if p in pixels and not (dx and dy and ((x + dx, y) in pixels or (x, y + dy) in pixels)):
+                neighbors.append(p)
+        adjacent[(x, y)] = sorted(neighbors)
+    used = set()
+    runs = []
+    def walk(a, b):
+        run = [a]
+        while True:
+            used.add(tuple(sorted((a, b))))
+            run.append(b)
+            nexts = [p for p in adjacent[b] if tuple(sorted((b, p))) not in used]
+            if len(adjacent[b]) != 2 or not nexts:
+                break
+            a, b = b, nexts[0]
+        if len(run) >= 4:
+            pts = np.array(run, np.float32).reshape(-1, 1, 2)
+            # Subpixel error limit; no coarse approximation of nose/hair.
+            simplified = cv2.approxPolyDP(pts, 0.38, False).reshape(-1, 2)
+            length = sum(math.dist(a, b) for a, b in zip(run, run[1:]))
+            if length >= 8:
+                runs.append((simplified.tolist(), length))
+    for p in sorted(pixels, key=lambda p: (p[1], p[0])):
+        if len(adjacent[p]) != 2:
+            for q in adjacent[p]:
+                if tuple(sorted((p, q))) not in used:
+                    walk(p, q)
+    for p in sorted(pixels, key=lambda p: (p[1], p[0])):
+        for q in adjacent[p]:
+            if tuple(sorted((p, q))) not in used:
+                walk(p, q)
+    # Anatomical regions first, then nearby strokes. This is not a top-down
+    # spatial reveal: eyes/nose/mouth resolve before hair and the jacket.
+    def region(points):
+        x, y = np.mean(points, axis=0)
+        if 355 < x < 755 and 385 < y < 520: return 0  # brows and eyes
+        if 470 < x < 625 and 500 < y < 640: return 1  # actual nose contours
+        if 440 < x < 660 and 640 < y < 735: return 2  # lips
+        if y < 390: return 3  # curls, including their boundary
+        if y < 860: return 4  # ears, face/jaw and stubble
+        if y < 1045 and 350 < x < 755: return 5  # neck
+        return 6  # collar and shoulders, logo-cleaned upstream
+    runs.sort(key=lambda r: (region(r[0]), int(np.mean(r[0], axis=0)[1] // 35), np.mean(r[0], axis=0)[0]))
+    return runs
+
+
+def generate():
+    WORK.mkdir(exist_ok=True)
+    image = Image.open(SOURCE)
+    runs = trace(image)
+    total = sum(length for _, length in runs)
+    time = 0.0
+    paths = []
+    for points, length in runs:
+        duration = 4800 * length / total
+        d = 'M' + ' L'.join(f'{x:g},{y:g}' for x, y in points)
+        paths.append(f'<path d="{d}" pathLength="1" style="--start:{time:.4f}ms;--duration:{duration:.4f}ms"/>')
+        time += duration
+    digest = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1122 1402" fill="none" role="img" aria-labelledby="title desc">
+<title id="title">Brass pen portrait of Dominik Peric</title>
+<desc id="desc">Native-resolution continuous contour strokes traced from the supplied logo-cleaned portrait. Eyes, nose, mouth, curls, face, neck, then shoulders.</desc>
+<!-- Generated by scripts/generate-portrait-strokes.py; source SHA256 {digest} -->
+<style>
+:root {{ color-scheme: normal; background: transparent; }}
+path {{ stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw var(--duration) linear var(--start) forwards; }}
+@keyframes draw {{ to {{ stroke-dashoffset: 0; }} }}
+.tonal-finish {{ opacity: 0; animation: finish 400ms linear 4800ms forwards; }}
+.pen-strokes {{ animation: settle 400ms linear 4800ms forwards; }}
+@keyframes finish {{ to {{ opacity: 1; }} }}
+@keyframes settle {{ to {{ opacity: 0; }} }}
+@media (prefers-reduced-motion: reduce) {{
+path {{ animation: none !important; stroke-dashoffset: 0; }}
+.tonal-finish {{ animation: none !important; opacity: 1; }}
+.pen-strokes {{ animation: none !important; opacity: 0; }}
+}}
+</style>
+<g class="pen-strokes" stroke="#d4a04a" stroke-width="1.4" stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round">
+{chr(10).join(paths)}
+</g>
+<image class="tonal-finish" href="dominik-portrait-detailed.png" x="0" y="0" width="1122" height="1402"/>
+</svg>
+'''
+    OUTPUT.write_text(svg)
+    # Independent dark raster preview of precisely the generated polylines.
+    scale = 3
+    preview = Image.new('RGB', (image.width * scale, image.height * scale), '#171410')
+    draw = ImageDraw.Draw(preview)
+    for points, _ in runs:
+        draw.line([(x * scale, y * scale) for x, y in points], fill=(193, 146, 69), width=4)
+    preview = preview.resize(image.size, Image.Resampling.LANCZOS)
+    preview.save(WORK / 'portrait-vector-full.png')
+    preview.crop((265, 375, 835, 870)).resize((1140, 990)).save(WORK / 'portrait-vector-face.png')
+    preview.crop((465, 485, 635, 640)).resize((680, 620)).save(WORK / 'portrait-vector-nose.png')
+    before = Image.new('RGBA', image.size, '#171410')
+    before.alpha_composite(image.convert('RGBA'))
+    before.convert('RGB').save(WORK / 'portrait-final-full.png')
+    before.crop((265, 375, 835, 870)).convert('RGB').resize((1140, 990)).save(WORK / 'portrait-final-face.png')
+    before.crop((465, 485, 635, 640)).convert('RGB').resize((680, 620)).save(WORK / 'portrait-final-nose.png')
+    pair = Image.new('RGB', (image.width * 2, image.height), '#171410')
+    pair.paste(before.convert('RGB'), (0, 0))
+    pair.paste(preview, (image.width, 0))
+    pair.save(WORK / 'portrait-before-after.png')
+    stats = {'source_sha256': digest, 'dependencies': {name: importlib.metadata.version(name) for name in ('pillow', 'opencv-python-headless', 'numpy')}, 'strokes': len(runs), 'points': sum(len(p) for p, _ in runs), 'length': total, 'duration_ms': time, 'svg_bytes': OUTPUT.stat().st_size}
+    (WORK / 'trace-stats.json').write_text(json.dumps(stats, indent=2) + '\n')
+    print(json.dumps(stats, indent=2))
+
+
+if __name__ == '__main__':
+    generate()
