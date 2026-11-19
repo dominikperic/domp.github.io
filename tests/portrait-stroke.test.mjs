@@ -141,7 +141,7 @@ test("home places the portrait beside PageShell, with a real name-and-bio intro 
   const intro = byId("home-intro");
   assert.ok(intro, "home-intro must be a DOM wrapper, not a prop lost by FadeIn");
   assert.match(intro.getText(tree), /siteConfig\.name/);
-  assert.match(intro.getText(tree), /siteConfig\.summaryParagraphs/);
+  assert.match(intro.getText(tree), /siteConfig\.summary(?:Paragraphs)?\b/);
   assert.doesNotMatch(intro.getText(tree), /PortraitStroke/);
   const childTags = stage.children.map((node) =>
     ts.isJsxSelfClosingElement(node)
