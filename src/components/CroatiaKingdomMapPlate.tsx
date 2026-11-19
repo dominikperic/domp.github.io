@@ -27,6 +27,10 @@ const PARENT_PLACES = [
   },
 ] as const;
 
+/** Vertical stretch on the land plate only — pins counter-scale so markers stay round. */
+const MAP_SCALE_Y = 1.32;
+const PIN_COUNTER_SCALE_Y = 1 / MAP_SCALE_Y;
+
 /**
  * Antique kingdom map in the RIGHT empty gutter — not inside the Identity text column.
  * Always vertically centered on #identity (measured live).
@@ -156,10 +160,11 @@ export function CroatiaKingdomMapPlate() {
       aria-label="Historical map plate"
     >
       <figure className="m-0">
-        {/* Taller plate (stretch down only); same width; markers scale with the map */}
+        {/* Taller plate (stretch down only). Pins sit in this layer for % placement,
+            then counter-scaleY so dots stay circular (parent scaleY would oval them). */}
         <div
           className="relative w-full origin-top"
-          style={{ transform: "scaleY(1.32)", marginBottom: "22%" }}
+          style={{ transform: `scaleY(${MAP_SCALE_Y})`, marginBottom: "22%" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- local SVG + CSS sepia */}
           <img
@@ -181,15 +186,20 @@ export function CroatiaKingdomMapPlate() {
               <div
                 key={place.id}
                 className={cx(
-                  "absolute -translate-x-1/2 -translate-y-1/2",
+                  "absolute",
                   open ? "z-40" : "z-10",
                 )}
-                style={{ left: `${place.leftPct}%`, top: `${place.topPct}%` }}
+                style={{
+                  left: `${place.leftPct}%`,
+                  top: `${place.topPct}%`,
+                  // Undo plate scaleY so the pin geometry is a circle again
+                  transform: `translate(-50%, -50%) scaleY(${PIN_COUNTER_SCALE_Y})`,
+                }}
               >
                 <button
                   type="button"
                   className={cx(
-                    "relative flex h-3.5 w-3.5 items-center justify-center rounded-full",
+                    "relative flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full",
                     "border border-brass bg-accent shadow-[0_0_0_3px_rgba(212,160,74,0.25)]",
                     "transition hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                   )}
