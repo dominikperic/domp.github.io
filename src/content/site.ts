@@ -12,16 +12,53 @@ export type NavItem = {
 export const siteConfig = {
   name: "Dominik Peric",
   shortName: "Dominik",
-  title: "Dominik Peric — Software, Data, and AI",
+  title: "Dominik Peric",
   description:
-    "Personal site of Dominik Peric, a Georgia Tech Computer Science graduate exploring software engineering, data engineering, machine learning, and AI research.",
+    "Personal site of Dominik Peric — Georgia Tech CS grad working across software, data, and AI.",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://dominikperic.github.io",
   locale: "en_US",
-  tagline: "Building thoughtful systems at the intersection of software, data, and AI.",
+  /** Short line under the name on the home page */
+  tagline: "Software & data engineering.",
   summary:
-    "I'm a Computer Science graduate from Georgia Tech with experience across full-stack software engineering, data engineering, machine learning, and AI research. This site is a living notebook of what I'm building, studying, and exploring.",
+    "Computer Science, Georgia Tech. I work at Neretva Group on software and data systems. Outside of that I play guitar, drums, accordion, banjo, bass, piano, jaw harp, and anything else I can get my hands on.",
   location: "United States",
-  availability: "Open to interesting collaborations and conversations",
+  availability: "Open to conversations",
+} as const;
+
+/** Home page Identity section — only facts Dominik supplied. */
+export type IdentitySegment = {
+  text: string;
+  href?: string;
+};
+
+export const identityContent = {
+  title: "Identity",
+  paragraphs: [
+    [
+      {
+        text: "I am a first generation American. My parents are Croats from Bosnia and Herzegovina who immigrated to America before the war in Yugoslavia.",
+      },
+    ],
+    [
+      {
+        text: "I stay close to my Croatian side through the Chicago Croatian community on the South Side and the North Side at St. Jerome Catholic Church and the Croatian Cultural Center. I was part of ",
+      },
+      {
+        text: "Hrvatska Loza Chicago",
+        href: "https://www.croatianculturalcenterchicago.com/hrvatska-loza",
+      },
+      {
+        text: " (Croatian Vines Chicago) for most of my youth through high school, and I play in ",
+      },
+      {
+        text: "Grupa Kliks",
+        href: "https://www.facebook.com/grupa.kliks/",
+      },
+      {
+        text: ", a Croatian tambura band.",
+      },
+    ],
+  ] satisfies IdentitySegment[][],
 } as const;
 
 export const navigation: NavItem[] = [
@@ -32,10 +69,6 @@ export const navigation: NavItem[] = [
   { label: "Contact", href: "/contact" },
 ];
 
-/**
- * Replace placeholder social links with your real profiles.
- * Keep external: true for third-party sites.
- */
 export const socialLinks: SocialLink[] = [
   {
     label: "GitHub",
