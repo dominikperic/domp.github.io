@@ -13,11 +13,14 @@ export function containerLeftEdge(viewportWidth: number): number {
 
 /**
  * Approximate string-group placement (mirrors ScrollStringCoil groupLayout midpoint).
- * Returns left offset (px) and group width for aligning UI above the strings.
+ * Returns left offset (px), full SVG width, string-span width (leftmost→rightmost string),
+ * and mid for aligning UI above the strings.
  */
 export function stringGutterPlacement(viewportWidth: number): {
   left: number;
   width: number;
+  /** Distance from leftmost string to rightmost string (no side pads). */
+  groupWidth: number;
   mid: number;
 } {
   const narrow = viewportWidth < 640;
@@ -29,7 +32,7 @@ export function stringGutterPlacement(viewportWidth: number): {
 
   if (leftGutter < groupWidth + sidePad * 2 + 8) {
     const left = Math.max(6, Math.min(12, leftGutter * 0.25));
-    return { left, width: svgWidth, mid: left + svgWidth / 2 };
+    return { left, width: svgWidth, groupWidth, mid: left + svgWidth / 2 };
   }
 
   const gutterMid = leftGutter / 2;
@@ -40,5 +43,5 @@ export function stringGutterPlacement(viewportWidth: number): {
     left = Math.max(4, maxRight - svgWidth);
   }
   left = Math.max(4, left);
-  return { left, width: svgWidth, mid: left + svgWidth / 2 };
+  return { left, width: svgWidth, groupWidth, mid: left + svgWidth / 2 };
 }
