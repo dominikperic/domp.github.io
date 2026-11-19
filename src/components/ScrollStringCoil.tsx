@@ -17,8 +17,8 @@ const CONTAINER_MAX_PX = 68 * 16; // 68rem
 const CONTAINER_INLINE_GUTTER_PX = 32; // 2rem total
 /** After scroll stops, amplitude falls to zero over this many ms (quick log-like curve). */
 const VIBRATE_DECAY_MS = 1500;
-/** Base oscillation rate (Hz) — high enough to read as a strummed blur. */
-const VIBRATE_HZ_BASE = 22;
+/** Lower visual oscillation rate (Hz) for flowing waves rather than strum blur. */
+const VIBRATE_HZ_BASE = 9;
 /**
  * Exponential decay steepness. Higher = faster early drop (log-like ring-out).
  * gain = (e^{-k u} - e^{-k}) / (1 - e^{-k}) with u = elapsed/T ∈ [0,1].
@@ -56,16 +56,17 @@ type BurstSeed = {
 };
 
 function freshBurstSeed(): BurstSeed {
-  const w1 = rand(0.4, 0.6);
-  const w2 = rand(0.2, 0.35);
+  // Favor the longest wave (w3); keep the normalized mix and swing budget unchanged.
+  const w1 = rand(0.2, 0.3);
+  const w2 = rand(0.1, 0.18);
   const w3 = 1 - w1 - w2;
   const tW1 = rand(0.45, 0.65);
   const tW2 = rand(0.2, 0.35);
   const tW3 = 1 - tW1 - tW2;
   return {
-    len1: rand(0.14, 0.28),
-    len2: rand(0.08, 0.16),
-    len3: rand(0.24, 0.42),
+    len1: rand(0.36, 0.55),
+    len2: rand(0.22, 0.34),
+    len3: rand(0.6, 0.9),
     p1: rand(0, Math.PI * 2),
     p2: rand(0, Math.PI * 2),
     p3: rand(0, Math.PI * 2),
@@ -73,9 +74,9 @@ function freshBurstSeed(): BurstSeed {
     w2,
     w3,
     stringJitter: Array.from({ length: STRING_COUNT }, () => rand(-0.55, 0.55)),
-    hzScale: rand(0.9, 1.25),
-    tHz2: rand(1.6, 2.8),
-    tHz3: rand(0.45, 0.9),
+    hzScale: rand(0.75, 1.05),
+    tHz2: rand(1.2, 1.8),
+    tHz3: rand(0.35, 0.7),
     tPhase2: rand(0, Math.PI * 2),
     tPhase3: rand(0, Math.PI * 2),
     tW1,
