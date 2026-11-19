@@ -1,7 +1,7 @@
 # Maps
 
-| File | Notes |
-|------|--------|
+| File                          | Notes                                                                                                                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `croatia-kingdom-antique.svg` | Transparent outside the land silhouette. Illustrative **Kingdom of Croatia with Bosnia** plate (modern Croatia + Bosnia and Herzegovina outlines as a visual stand-in for the medieval crown realm — not a scholarly historical boundary). |
 
 ## Source & license

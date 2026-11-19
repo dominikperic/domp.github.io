@@ -185,10 +185,7 @@ export function CroatiaKingdomMapPlate() {
             return (
               <div
                 key={place.id}
-                className={cx(
-                  "absolute",
-                  open ? "z-40" : "z-10",
-                )}
+                className={cx("absolute", open ? "z-40" : "z-10")}
                 style={{
                   left: `${place.leftPct}%`,
                   top: `${place.topPct}%`,
@@ -220,7 +217,9 @@ export function CroatiaKingdomMapPlate() {
                     role="tooltip"
                     className={cx(
                       "absolute left-1/2 z-50 w-max max-w-[12rem] -translate-x-1/2",
-                      place.topPct > 55 ? "bottom-[calc(100%+0.55rem)]" : "top-[calc(100%+0.55rem)]",
+                      place.topPct > 55
+                        ? "bottom-[calc(100%+0.55rem)]"
+                        : "top-[calc(100%+0.55rem)]",
                       "rounded-sm border border-border-strong bg-card px-2.5 py-2 text-left shadow-lg",
                     )}
                   >
