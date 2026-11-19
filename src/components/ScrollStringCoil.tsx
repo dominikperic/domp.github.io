@@ -18,7 +18,7 @@ const CONTAINER_INLINE_GUTTER_PX = 32; // 2rem total
 /** After scroll stops, amplitude falls to zero over this many ms (quick log-like curve). */
 const VIBRATE_DECAY_MS = 1500;
 /** Lower visual oscillation rate (Hz) for flowing waves rather than strum blur. */
-const VIBRATE_HZ_BASE = 9;
+const VIBRATE_HZ_BASE = 8;
 /**
  * Exponential decay steepness. Higher = faster early drop (log-like ring-out).
  * gain = (e^{-k u} - e^{-k}) / (1 - e^{-k}) with u = elapsed/T ∈ [0,1].
@@ -44,7 +44,7 @@ type BurstSeed = {
   w3: number;
   /** Per-string spatial offset jitter. */
   stringJitter: number[];
-  /** Temporal multi-osc: relative Hz and phases (noisy L/R, not a pure sine). */
+  /** Fundamental-led temporal mix with weak, slowly beating secondary modes. */
   hzScale: number;
   tHz2: number;
   tHz3: number;
@@ -56,17 +56,18 @@ type BurstSeed = {
 };
 
 function freshBurstSeed(): BurstSeed {
-  // Favor the longest wave (w3); keep the normalized mix and swing budget unchanged.
-  const w1 = rand(0.2, 0.3);
-  const w2 = rand(0.1, 0.18);
+  // One broad streamline with small secondary bends, not several competing ripples.
+  // Positive weights sum to one so neither field needs hard clipping at its peaks.
+  const w1 = rand(0.1, 0.15);
+  const w2 = rand(0.03, 0.06);
   const w3 = 1 - w1 - w2;
-  const tW1 = rand(0.45, 0.65);
-  const tW2 = rand(0.2, 0.35);
+  const tW1 = rand(0.86, 0.9);
+  const tW2 = rand(0.05, 0.08);
   const tW3 = 1 - tW1 - tW2;
   return {
-    len1: rand(0.36, 0.55),
-    len2: rand(0.22, 0.34),
-    len3: rand(0.6, 0.9),
+    len1: rand(0.65, 0.85),
+    len2: rand(0.45, 0.6),
+    len3: rand(0.95, 1.35),
     p1: rand(0, Math.PI * 2),
     p2: rand(0, Math.PI * 2),
     p3: rand(0, Math.PI * 2),
@@ -75,7 +76,7 @@ function freshBurstSeed(): BurstSeed {
     w3,
     stringJitter: Array.from({ length: STRING_COUNT }, () => rand(-0.55, 0.55)),
     hzScale: rand(0.75, 1.05),
-    tHz2: rand(1.2, 1.8),
+    tHz2: rand(1.05, 1.3),
     tHz3: rand(0.35, 0.7),
     tPhase2: rand(0, Math.PI * 2),
     tPhase3: rand(0, Math.PI * 2),
@@ -146,16 +147,16 @@ function spatialRipple(y: number, height: number, stringIndex: number, seed: Bur
     seed.w1 * Math.sin(k1 * y + seed.p1 + j) +
     seed.w2 * Math.sin(k2 * y + seed.p2 + j * 1.3) +
     seed.w3 * Math.sin(k3 * y + seed.p3 + j * 0.7);
-  return Math.max(-1, Math.min(1, raw * 1.2));
+  return raw;
 }
 
-/** Noisy temporal L/R driver from multiple incommensurate oscillators. */
+/** Smooth L/R driver: a dominant fundamental and gentle randomized beating. */
 function temporalOsc(phase: number, seed: BurstSeed): number {
   const raw =
     seed.tW1 * Math.sin(phase) +
     seed.tW2 * Math.sin(phase * seed.tHz2 + seed.tPhase2) +
     seed.tW3 * Math.sin(phase * seed.tHz3 + seed.tPhase3);
-  return Math.max(-1, Math.min(1, raw * 1.25));
+  return raw;
 }
 
 /**

@@ -26,21 +26,43 @@ vm.runInContext(
 );
 const motion = context.exports.motion;
 
-test("scroll bursts use lower temporal frequencies and longer dominant waves", () => {
-  assert.ok(
-    motion.VIBRATE_HZ_BASE >= 8 && motion.VIBRATE_HZ_BASE <= 11,
-    "base should be 8–11 Hz, not strum blur",
-  );
+test("streamline bursts favor one viewport-scale wave and a soft fundamental", () => {
+  assert.ok(motion.VIBRATE_HZ_BASE >= 7 && motion.VIBRATE_HZ_BASE <= 9);
   for (let i = 0; i < 500; i++) {
     const seed = motion.freshBurstSeed();
     assert.ok(seed.hzScale >= 0.75 && seed.hzScale <= 1.05);
-    assert.ok(seed.tHz2 >= 1.2 && seed.tHz2 <= 1.8);
+    assert.ok(seed.tHz2 >= 1.05 && seed.tHz2 <= 1.3);
     assert.ok(seed.tHz3 >= 0.35 && seed.tHz3 <= 0.7);
-    assert.ok(seed.len1 >= 0.36 && seed.len1 <= 0.55);
-    assert.ok(seed.len2 >= 0.22 && seed.len2 <= 0.34);
-    assert.ok(seed.len3 >= 0.6 && seed.len3 <= 0.9);
-    assert.ok(seed.w3 > seed.w1 && seed.w3 > seed.w2, "longest wave dominates");
+    assert.ok(seed.len1 >= 0.65 && seed.len1 <= 0.85);
+    assert.ok(seed.len2 >= 0.45 && seed.len2 <= 0.6);
+    assert.ok(seed.len3 >= 0.95 && seed.len3 <= 1.35);
+    assert.ok(seed.w3 >= 0.79, "viewport-scale wave dominates weak secondary bends");
+    assert.ok(seed.tW1 >= 0.86, "temporal fundamental dominates");
     assert.ok(Math.abs(seed.w1 + seed.w2 + seed.w3 - 1) < 1e-12);
+    assert.ok(Math.abs(seed.tW1 + seed.tW2 + seed.tW3 - 1) < 1e-12);
+  }
+});
+
+test("spatial bends and temporal turns have continuous, bounded curvature", () => {
+  const step = 0.001;
+  for (let burst = 0; burst < 50; burst++) {
+    const seed = motion.freshBurstSeed();
+    for (let i = 1; i < 1000; i++) {
+      const t = i / 1000;
+      const spatial = (y) => motion.spatialRipple(y, 1, burst % 6, seed);
+      const temporal = (phase) => motion.temporalOsc(phase, seed);
+      for (const [field, position, limit] of [
+        [spatial, t, 80],
+        [temporal, t * Math.PI * 4, 1.2],
+      ]) {
+        const center = field(position);
+        const curvature = Math.abs(
+          (field(position + step) - 2 * center + field(position - step)) / step ** 2,
+        );
+        assert.ok(Math.abs(center) <= 1, "normalized fields preserve the amplitude ceiling");
+        assert.ok(curvature < limit, `smooth curvature ${curvature} must stay below ${limit}`);
+      }
+    }
   }
 });
 
