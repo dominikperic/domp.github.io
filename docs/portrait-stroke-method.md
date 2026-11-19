@@ -26,17 +26,18 @@ The generator does not modify either input portrait. It writes the SVG and `.por
 2. Composite RGB luminance against transparency. Interior tonal pencil detail is in RGB, not alpha; alpha-only tracing produces almost nothing except the outline.
 3. Apply a native-resolution bilateral filter (7 px neighborhood, color sigma 24, spatial sigma 2), then Canny edges (28/65, L2 gradient). This suppresses the smallest grain without moving the actual nose, curls, eyelids, ears, jaw, neck, or shoulders.
 4. Traverse the one-pixel edge graph into connected pen runs. Reject diagonal corner triangles, split at branches, and discard runs shorter than 8 source pixels. Simplify with a maximum 0.38 px error. This is a fine contour trace, not filled silhouette blobs or a coarse manually approximated face.
-5. Order by anatomical region: brows/eyes, nose, lips, curls, ears/face/jaw, neck, collar/shoulders. Within each region use narrow horizontal bands and x position. This is deterministic regional sketch ordering, **not** recovered original artist pen order and not one unbroken Eulerian line: the pen lifts between disconnected source marks.
+5. **Order top-left → bottom-right** by stroke centroid diagonal (`y + x`), then y, then x. Drawing starts at the crown/left and ends at the lower-right shoulders.
 6. Give each run one `M` and connected `L` coordinates, normalized `pathLength="1"`, and a **non-overlapping, length-proportional** dash-offset animation. Total vector drawing time is **4800 ms**. The vector stroke is **#d4a04a**, width 1.4 native pixels, opacity 0.9, with round caps and joins.
 
 ## Honest visual tradeoff: hybrid tonal finish
 
 Pure edge tracing preserves geometric position but cannot preserve the supplied sketch's continuous cheek/nose shading and dark curls. Visual inspection showed that an all-vector edge-only final image reads more like an engraving and exaggerates skin texture. The implementation therefore uses the permitted hybrid finish:
 
-- **0–4.8 s:** exclusively genuine sequential brass vector pen strokes, with no raster visible and no clip/mask/wipe.
-- **4.8–5.2 s:** a 400 ms opacity crossfade from the completed trace to the **unchanged source-faithful detailed PNG**, retaining the exact nose, hair, ears, jaw, neck, shoulders and cleaned clothing.
-- **After 5.2 s:** the original detailed portrait, not an allegedly equivalent vector rendering.
-- **Reduced motion:** full final portrait immediately; all animations disabled. The policy and animation live inside the SVG and work when opened standalone as well as on the home page.
+- **0–4.8 s:** genuine sequential brass vector pen strokes (unchanged TL→BR order); only strokes are visible for the first 2.4 s.
+- **2.4–7.2 s:** the **unchanged source-faithful detailed PNG** fills with the existing **top-left → bottom-right diagonal wipe** (`fill-tl-br` clip-path animation). The fill starts halfway through the pen timeline and lasts **4800 ms**, the same full-pass duration as the strokes. Existing wipe keyframes and easing are unchanged.
+- **6.48–6.83 s:** pen strokes fade out over 350 ms near the end of the fill.
+- **After 7.2 s:** full detailed portrait, fully settled.
+- **Reduced motion:** full final portrait immediately; all animations disabled.
 
 The SVG's relative PNG reference requires the existing detailed PNG next to it. This deliberately avoids duplicating the raster as base64 and makes the source dependency explicit. Neither asset paints a background outside the portrait. The final image retains the source's brass tonal palette; only the actual vector pen strokes have the uniform #d4a04a color.
 

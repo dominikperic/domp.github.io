@@ -95,18 +95,59 @@ test("HD asset draws ordered fine vector paths in 3–6 seconds with instant red
   assert.ok(end >= 3000 && end <= 6000, `total draw time ${end}ms`);
 });
 
-test("source-faithful tonal finish fades only after the pen phase, without clipping or wiping", () => {
+test("source-faithful TL→BR fill starts halfway through the pen pass at the same duration", () => {
   const svg = fs.readFileSync(
     path.join(root, "public/portraits/dominik-portrait-stroke-hd.svg"),
     "utf8",
   );
   assert.match(svg, /<image[^>]+class="tonal-finish"[^>]+href="dominik-portrait-detailed.png"/);
+  const strokes = [...svg.matchAll(/--start:([\d.]+)ms;--duration:([\d.]+)ms/g)];
+  const last = strokes.at(-1);
+  assert.ok(last, "stroke timeline exists");
+  const strokeMs = Number(last[1]) + Number(last[2]);
+  assert.ok(Math.abs(strokeMs - 4800) < 0.02, "keep the full 4800ms pen pass");
+  const fill = svg.match(/animation:\s*fill-tl-br\s+([\d.]+)ms[^;]*?\s([\d.]+)ms forwards/);
+  assert.ok(fill, "fill animation declares duration and delay");
+  const [, duration, start] = fill.map(Number);
+  assert.ok(Math.abs(start - strokeMs * 0.5) < 0.02, "fill begins halfway through pen");
+  assert.ok(Math.abs(duration - strokeMs) < 0.02, "fill lasts one full pen pass");
+  const settle = svg.match(/animation:\s*settle\s+([\d.]+)ms linear ([\d.]+)ms forwards/);
+  assert.ok(settle, "pen fades near the end of the fill");
+  const settleEnd = Number(settle[1]) + Number(settle[2]);
+  assert.ok(Number(settle[2]) >= start + duration * 0.85);
+  assert.ok(settleEnd <= start + duration, "pen is gone by the final 7200ms frame");
+  assert.match(svg, /@keyframes fill-tl-br/);
+  assert.match(svg, /clip-path:\s*polygon/);
   assert.match(
     svg,
-    /\.tonal-finish\s*\{[^}]*opacity:\s*0;[^}]*animation:\s*finish 400ms linear 4800ms forwards/,
+    /\.tonal-finish\s*\{\s*animation:\s*none\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?clip-path:\s*none/,
   );
-  assert.match(svg, /@keyframes finish\s*\{\s*to\s*\{\s*opacity:\s*1/);
-  assert.match(svg, /\.tonal-finish\s*\{\s*animation:\s*none\s*!important;\s*opacity:\s*1/);
+});
+
+test("pen strokes are ordered top-left toward bottom-right", () => {
+  const svg = fs.readFileSync(
+    path.join(root, "public/portraits/dominik-portrait-stroke-hd.svg"),
+    "utf8",
+  );
+  const strokes = [
+    ...svg.matchAll(
+      /<path\s+[^>]*d="([^"]+)"[^>]*style="--start:([\d.]+)ms;--duration:([\d.]+)ms"/g,
+    ),
+  ];
+  function centroid(d) {
+    const nums = [...d.matchAll(/([\d.]+),([\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    const mx = nums.reduce((s, p) => s + p[0], 0) / nums.length;
+    const my = nums.reduce((s, p) => s + p[1], 0) / nums.length;
+    return mx + my;
+  }
+  const early = strokes.slice(0, 80).map((m) => centroid(m[1]));
+  const late = strokes.slice(-80).map((m) => centroid(m[1]));
+  const earlyMed = early.sort((a, b) => a - b)[Math.floor(early.length / 2)];
+  const lateMed = late.sort((a, b) => a - b)[Math.floor(late.length / 2)];
+  assert.ok(
+    earlyMed < lateMed,
+    `expected early strokes nearer top-left than late (early=${earlyMed}, late=${lateMed})`,
+  );
 });
 
 test("detailed brass PNG asset exists (transparent, from user sketch)", () => {
