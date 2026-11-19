@@ -124,6 +124,29 @@ test("source-faithful TL→BR fill starts halfway through the pen pass at the sa
   );
 });
 
+test("tonal fill sweeps at constant diagonal speed without a midpoint topology change", () => {
+  const svg = fs.readFileSync(
+    path.join(root, "public/portraits/dominik-portrait-stroke-hd.svg"),
+    "utf8",
+  );
+  assert.match(svg, /animation:\s*fill-tl-br\s+4800ms linear 2400ms forwards/);
+  const keyframes = svg.match(/@keyframes fill-tl-br\s*\{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(keyframes, "fill keyframes exist");
+  const frames = [...keyframes.matchAll(/([\d.]+)%\s*\{\s*clip-path:\s*polygon\(([^)]+)\)/g)];
+  assert.deepEqual(
+    frames.map((frame) => Number(frame[1])),
+    [0, 100],
+  );
+  assert.deepEqual(
+    frames.map((frame) => frame[2].split(",").map((point) => point.trim())),
+    [
+      ["0% 0%", "0% 0%", "0% 0%"],
+      ["0% 0%", "200% 0%", "0% 200%"],
+    ],
+    "matching triangle vertices keep the hypotenuse moving linearly across the full viewBox",
+  );
+});
+
 test("pen strokes are ordered top-left toward bottom-right", () => {
   const svg = fs.readFileSync(
     path.join(root, "public/portraits/dominik-portrait-stroke-hd.svg"),

@@ -115,16 +115,15 @@ path {{ stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw var(--duratio
 .tonal-finish {{
   opacity: 1;
   clip-path: polygon(0 0, 0 0, 0 0);
-  animation: fill-tl-br {fill_ms:.0f}ms cubic-bezier(0.33, 0, 0.2, 1) {fill_start_ms:.0f}ms forwards;
+  animation: fill-tl-br {fill_ms:.0f}ms linear {fill_start_ms:.0f}ms forwards;
 }}
 .pen-strokes {{
   animation: settle 350ms linear {fill_start_ms + fill_ms * 0.85:.0f}ms forwards;
 }}
 @keyframes fill-tl-br {{
-  /* Diagonal wipe expanding from top-left toward bottom-right */
+  /* One triangle: constant-speed hypotenuse sweeps the entire viewBox. */
   0%   {{ clip-path: polygon(0% 0%, 0% 0%, 0% 0%); }}
-  35%  {{ clip-path: polygon(0% 0%, 100% 0%, 0% 100%); }}
-  100% {{ clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%); }}
+  100% {{ clip-path: polygon(0% 0%, 200% 0%, 0% 200%); }}
 }}
 @keyframes settle {{ to {{ opacity: 0; }} }}
 @media (prefers-reduced-motion: reduce) {{

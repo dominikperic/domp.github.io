@@ -34,7 +34,7 @@ The generator does not modify either input portrait. It writes the SVG and `.por
 Pure edge tracing preserves geometric position but cannot preserve the supplied sketch's continuous cheek/nose shading and dark curls. Visual inspection showed that an all-vector edge-only final image reads more like an engraving and exaggerates skin texture. The implementation therefore uses the permitted hybrid finish:
 
 - **0–4.8 s:** genuine sequential brass vector pen strokes (unchanged TL→BR order); only strokes are visible for the first 2.4 s.
-- **2.4–7.2 s:** the **unchanged source-faithful detailed PNG** fills with the existing **top-left → bottom-right diagonal wipe** (`fill-tl-br` clip-path animation). The fill starts halfway through the pen timeline and lasts **4800 ms**, the same full-pass duration as the strokes. Existing wipe keyframes and easing are unchanged.
+- **2.4–7.2 s:** the **unchanged source-faithful detailed PNG** fills with a **top-left → bottom-right diagonal wipe** (`fill-tl-br` clip-path animation). The fill starts halfway through the pen timeline and lasts **4800 ms**, the same full-pass duration as the strokes. Linear interpolation expands one triangle from zero to 200% axis intercepts, keeping the diagonal boundary at constant speed with no midpoint shape change or pause.
 - **6.48–6.83 s:** pen strokes fade out over 350 ms near the end of the fill.
 - **After 7.2 s:** full detailed portrait, fully settled.
 - **Reduced motion:** full final portrait immediately; all animations disabled.
