@@ -66,6 +66,64 @@ test("spatial bends and temporal turns have continuous, bounded curvature", () =
   }
 });
 
+function pathOffsets(seed, phase, index = 0) {
+  return [
+    ...motion
+      .buildStringPath(100, 900, index, 50, 1, phase, seed, true)
+      .matchAll(/[ML] ([\d.-]+) ([\d.-]+)/g),
+  ].map((m) => Number(m[1]) - 100);
+}
+
+test("phase advances a traveling body instead of scaling a frozen shape", () => {
+  const seed = motion.freshBurstSeed();
+  const start = pathOffsets(seed, 0);
+  const next = pathOffsets(seed, Math.PI / 2);
+  assert.equal(start.length, 97, "phase zero must still contain a wavy body");
+  assert.ok(Math.max(...start.map(Math.abs)) > 10);
+  const dot = (a, b) => a.reduce((sum, x, i) => sum + x * b[i], 0);
+  const scale = dot(start, next) / dot(start, start);
+  const residual = next.map((x, i) => x - scale * start[i]);
+  assert.ok(
+    dot(residual, residual) / dot(next, next) > 0.2,
+    "later frames cannot be scalar multiples of the same fixed field",
+  );
+});
+
+test("traveling bends stay centered over time and differ across wakes", () => {
+  for (let burst = 0; burst < 8; burst++) {
+    const seed = motion.freshBurstSeed();
+    for (let index = 0; index < 6; index++) {
+      for (const y of [0.25, 0.5, 0.75]) {
+        let sum = 0;
+        let min = Infinity;
+        let max = -Infinity;
+        for (let frame = 0; frame < 4096; frame++) {
+          const phase = (frame / 4096) * Math.PI * 256;
+          const offset = motion.spatialRipple(y, 1, index, seed, phase);
+          sum += offset;
+          min = Math.min(min, offset);
+          max = Math.max(max, offset);
+        }
+        assert.ok(Math.abs(sum / 4096) < 0.004, "no DC drift from the resting line");
+        assert.ok(min < -0.2 && max > 0.2, "body bends to both sides of rest");
+      }
+    }
+    assert.notDeepEqual(pathOffsets(seed, 0.5), pathOffsets(motion.freshBurstSeed(), 0.5));
+  }
+});
+
+test("viewport taper is smooth, flat-ended and strongest through the middle", () => {
+  assert.equal(motion.diffractionEnv(0), 0);
+  assert.equal(motion.diffractionEnv(1), 0);
+  assert.equal(motion.diffractionEnv(0.5), 1);
+  for (const t of [0.001, 0.01, 0.03, 0.05]) {
+    assert.ok(motion.diffractionEnv(t) <= Math.PI ** 2 * t ** 2);
+    assert.ok(Math.abs(motion.diffractionEnv(t) - motion.diffractionEnv(1 - t)) < 1e-12);
+  }
+  assert.ok(motion.diffractionEnv(1 / 3) > 0.7);
+  assert.ok(motion.diffractionEnv(2 / 3) > 0.7);
+});
+
 test("six strings retain their swing budget, edge taper and static fallback", () => {
   assert.equal(motion.STRING_COUNT, 6);
   assert.equal(motion.VIBRATE_DECAY_MS, 1500);

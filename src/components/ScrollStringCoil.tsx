@@ -123,44 +123,43 @@ function groupLayout(viewportWidth: number) {
   return { left, groupWidth, amplitude, sidePad, svgWidth };
 }
 
-/** Single-slit style envelope on viewport t∈[0,1] — wide center, flat near ends. */
-const DIFFRACTION_BETA = 3.6;
-
-function sinc(u: number): number {
-  if (Math.abs(u) < 1e-10) return 1;
-  return Math.sin(Math.PI * u) / (Math.PI * u);
-}
-
+/** Smooth viewport window: zero offset and zero slope at both ends. */
 function diffractionEnv(t: number): number {
-  const u = (t - 0.5) * DIFFRACTION_BETA;
-  const edge = Math.pow(Math.sin(Math.PI * t), 0.35);
-  return Math.abs(sinc(u)) * edge;
+  if (t <= 0 || t >= 1) return 0;
+  return Math.sin(Math.PI * t) ** 2;
 }
 
-/** Spatial ripple shaped by the current burst seed (different every scroll wake). */
-function spatialRipple(y: number, height: number, stringIndex: number, seed: BurstSeed): number {
+/** Traveling spatial ripple; a shared phase keeps the six strings flowing together. */
+function spatialRipple(
+  y: number,
+  height: number,
+  stringIndex: number,
+  seed: BurstSeed,
+  phase = 0,
+): number {
   const k1 = (Math.PI * 2) / (height * seed.len1);
   const k2 = (Math.PI * 2) / (height * seed.len2);
   const k3 = (Math.PI * 2) / (height * seed.len3);
   const j = seed.stringJitter[stringIndex] ?? 0;
   const raw =
-    seed.w1 * Math.sin(k1 * y + seed.p1 + j) +
-    seed.w2 * Math.sin(k2 * y + seed.p2 + j * 1.3) +
-    seed.w3 * Math.sin(k3 * y + seed.p3 + j * 0.7);
+    seed.w1 * temporalOsc(phase, seed, k1 * y + seed.p1 + j) +
+    seed.w2 * temporalOsc(phase, seed, k2 * y + seed.p2 + j * 1.3) +
+    seed.w3 * temporalOsc(phase, seed, k3 * y + seed.p3 + j * 0.7);
   return raw;
 }
 
-/** Smooth L/R driver: a dominant fundamental and gentle randomized beating. */
-function temporalOsc(phase: number, seed: BurstSeed): number {
+/** Phase travels through each bend, rather than scaling a frozen spatial field. */
+function temporalOsc(phase: number, seed: BurstSeed, spatialPhase = 0): number {
   const raw =
-    seed.tW1 * Math.sin(phase) +
-    seed.tW2 * Math.sin(phase * seed.tHz2 + seed.tPhase2) +
-    seed.tW3 * Math.sin(phase * seed.tHz3 + seed.tPhase3);
+    seed.tW1 * Math.sin(spatialPhase - phase) +
+    seed.tW2 * Math.sin(spatialPhase - phase * seed.tHz2 + seed.tPhase2) +
+    seed.tW3 * Math.sin(spatialPhase - phase * seed.tHz3 + seed.tPhase3);
   return raw;
 }
 
 /**
- * x = baseX + env * amp * gain * temporalOsc * spatialRipple
+ * x = baseX + sin(πt)² * amp * gain * travelingRipple(y, phase, seed)
+ * Every sine has zero temporal mean, so the body stays centered on baseX.
  * gain shrinks the swing to straight over 1.5s after scroll stops.
  */
 function buildStringPath(
@@ -169,22 +168,22 @@ function buildStringPath(
   stringIndex: number,
   amplitude: number,
   gain: number,
-  osc: number,
+  phase: number,
   seed: BurstSeed,
   animate: boolean,
 ): string {
-  if (!animate || height <= 0 || gain <= 0 || Math.abs(osc * gain) < 1e-4) {
+  if (!animate || height <= 0 || gain <= 0) {
     return `M ${baseX} 0 L ${baseX} ${height}`;
   }
 
-  const amp = amplitude * gain * (0.96 + (stringIndex % 3) * 0.02) * osc;
+  const amp = amplitude * gain * (0.96 + (stringIndex % 3) * 0.02);
 
   let d = "";
   for (let i = 0; i <= SAMPLE_COUNT; i++) {
     const t = i / SAMPLE_COUNT;
     const y = t * height;
     const env = diffractionEnv(t);
-    const spatial = spatialRipple(y, height, stringIndex, seed);
+    const spatial = spatialRipple(y, height, stringIndex, seed, phase);
     const x = baseX + env * amp * spatial;
     d += i === 0 ? `M ${x.toFixed(2)} ${y.toFixed(2)}` : ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
   }
@@ -192,7 +191,7 @@ function buildStringPath(
 }
 
 /**
- * Left-gutter guitar strings: wide center ripples that swing left/right.
+ * Left-gutter guitar strings: centered traveling bends with flat viewport ends.
  * Each scroll wake picks a new random burst seed (shape + timing noise).
  * After scroll stops, swing amplitude dies to straight over VIBRATE_DECAY_MS.
  */
@@ -259,7 +258,6 @@ export function ScrollStringCoil() {
         lastFrameTimeRef.current = now;
       }
 
-      const osc = animate && gain > 0 ? temporalOsc(oscPhaseRef.current, seed) : 0;
       const settled = !animate || gain <= 0;
 
       wrap.style.left = `${left}px`;
@@ -275,7 +273,16 @@ export function ScrollStringCoil() {
         const baseX = sidePad + slot * groupWidth;
         path.setAttribute(
           "d",
-          buildStringPath(baseX, height, index, amplitude, gain, osc, seed, animate),
+          buildStringPath(
+            baseX,
+            height,
+            index,
+            amplitude,
+            gain,
+            oscPhaseRef.current,
+            seed,
+            animate,
+          ),
         );
       }
 
