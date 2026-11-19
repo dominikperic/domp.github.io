@@ -24,6 +24,14 @@ const VIBRATE_HZ_BASE = 1.5;
  * gain = (e^{-k u} - e^{-k}) / (1 - e^{-k}) with u = elapsed/T ∈ [0,1].
  */
 const DECAY_K = 4.2;
+/** Full swing at 1200 px/s; slow movement retains a gentle 20% hint. */
+const SCROLL_SPEED_REF = 1200;
+const MIN_SCROLL_INTENSITY = 0.2;
+
+export function scrollIntensity(velocityPxPerSec: number): number {
+  const speed = Math.min(1, Math.abs(velocityPxPerSec) / SCROLL_SPEED_REF);
+  return MIN_SCROLL_INTENSITY + (1 - MIN_SCROLL_INTENSITY) * Math.sqrt(speed);
+}
 
 function rand(min: number, max: number) {
   return min + Math.random() * (max - min);
@@ -167,6 +175,10 @@ export function ScrollStringCoil() {
   const loopIdRef = useRef<number | null>(null);
   /** performance.now() of last scroll — starts the 2s decay clock. */
   const lastScrollTimeRef = useRef(0);
+  /** Velocity baseline is separate from the vibration release clock. */
+  const lastScrollYRef = useRef(0);
+  const lastScrollTsRef = useRef(0);
+  const intensityRef = useRef(MIN_SCROLL_INTENSITY);
   /** Radians; advances every frame while gain > 0. */
   const oscPhaseRef = useRef(0);
   const lastFrameTimeRef = useRef(0);
@@ -242,7 +254,7 @@ export function ScrollStringCoil() {
             height,
             index,
             amplitude,
-            gain,
+            gain * intensityRef.current,
             oscPhaseRef.current,
             seed,
             animate,
@@ -266,6 +278,12 @@ export function ScrollStringCoil() {
     };
 
     const onScroll = () => {
+      const now = performance.now();
+      const delta = window.scrollY - lastScrollYRef.current;
+      // Bound event timing and velocity, including the first event after idle.
+      const dt = Math.max(8, Math.min(50, now - lastScrollTsRef.current));
+      lastScrollYRef.current = window.scrollY;
+      lastScrollTsRef.current = now;
       if (reduceRef.current) {
         paint();
         silenceScrollAudio();
@@ -279,9 +297,15 @@ export function ScrollStringCoil() {
         return;
       }
 
-      const now = performance.now();
       const wasResting = vibrateGain(now) <= 0.05;
-      // Reset decay clock → full back-and-forth amplitude again.
+      const velocity = Math.min(SCROLL_SPEED_REF, (Math.abs(delta) * 1000) / dt);
+      const targetIntensity = scrollIntensity(velocity);
+      // Time-based EMA (80ms) avoids trackpad jitter without changing snake speed.
+      intensityRef.current = wasResting
+        ? targetIntensity
+        : intensityRef.current +
+          (targetIntensity - intensityRef.current) * (1 - Math.exp(-dt / 80));
+      // Reset decay clock → full gain, with swing strength set by scroll speed.
       lastScrollTimeRef.current = now;
       // New random shape + timing each time vibration wakes from rest.
       if (wasResting) {
@@ -315,6 +339,8 @@ export function ScrollStringCoil() {
     // Rest until first scroll.
     lastScrollTimeRef.current = performance.now() - VIBRATE_DECAY_MS - 1;
     lastFrameTimeRef.current = performance.now();
+    lastScrollYRef.current = window.scrollY;
+    lastScrollTsRef.current = performance.now();
     paint();
 
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -333,6 +359,8 @@ export function ScrollStringCoil() {
   useEffect(() => {
     markAppRouteChange();
     lastScrollTimeRef.current = performance.now() - VIBRATE_DECAY_MS - 1;
+    lastScrollYRef.current = window.scrollY;
+    lastScrollTsRef.current = performance.now();
     resetScrollAudioBaseline();
     // Force a static paint (straight strings) after route change.
     const svg = svgRef.current;

@@ -33,6 +33,163 @@ function pathOffsets(seed, phase, index = 0) {
   ].map((m) => Number(m[1]) - 100);
 }
 
+test("scroll intensity has a gentle floor, grows with absolute speed and saturates", () => {
+  const intensity = context.exports.scrollIntensity;
+  assert.equal(typeof intensity, "function");
+  assert.equal(intensity(0), 0.2, "floor keeps even slow scrolls readable");
+  const speeds = [0, 25, 100, 300, 600, 1200];
+  const values = speeds.map(intensity);
+  for (let i = 1; i < values.length; i++) {
+    assert.ok(values[i] > values[i - 1]);
+  }
+  for (const speed of speeds) {
+    assert.equal(intensity(-speed), intensity(speed));
+    assert.ok(intensity(speed) >= 0.2 && intensity(speed) <= 1);
+  }
+  assert.ok(intensity(25) < 0.35);
+  assert.equal(intensity(1200), 1);
+  assert.equal(intensity(100000), 1);
+});
+
+// Mount the real effect/event/paint pipeline with a deterministic clock and DOM.
+function mountCoil() {
+  let now = 10000;
+  let suppressed = false;
+  const effects = [];
+  const listeners = new Map();
+  let frame;
+  const window = {
+    scrollY: 0,
+    innerWidth: 1440,
+    innerHeight: 900,
+    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    addEventListener: (name, fn) => listeners.set(name, fn),
+    removeEventListener: (name) => listeners.delete(name),
+    dispatchEvent: (event) => listeners.get(event.type)?.(),
+    requestAnimationFrame: (fn) => {
+      frame = fn;
+      return 1;
+    },
+    cancelAnimationFrame: () => {
+      frame = undefined;
+    },
+  };
+  const jsx = (type, props) => ({ type, props });
+  const sandbox = vm.createContext({
+    exports: {},
+    window,
+    Event,
+    performance: { now: () => now },
+    Math: Object.assign(Object.create(Math), { random: () => 0.5 }),
+    require: (name) => {
+      if (name === "react")
+        return {
+          useRef: (current) => ({ current }),
+          useEffect: (effect) => effects.push(effect),
+        };
+      if (name === "next/navigation") return { usePathname: () => "/" };
+      if (name.endsWith("scrollFxGuard"))
+        return {
+          markAppRouteChange() {},
+          isScrollFxSuppressed: () => suppressed,
+        };
+      if (name.endsWith("scrollStringAudio"))
+        return {
+          notifyScrollAudio() {},
+          resetScrollAudioBaseline() {},
+          silenceScrollAudio() {},
+        };
+      return { jsx, jsxs: jsx };
+    },
+  });
+  vm.runInContext(
+    ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText,
+    sandbox,
+  );
+  const paths = [];
+  function attach(element) {
+    if (!element) return;
+    if (Array.isArray(element)) return element.forEach(attach);
+    const node = {
+      style: {},
+      setAttribute(name, value) {
+        this[name] = value;
+      },
+    };
+    if (element.type === "path") paths.push(node);
+    if (typeof element.props.ref === "function") element.props.ref(node);
+    else if (element.props.ref) element.props.ref.current = node;
+    attach(element.props.children);
+  }
+  attach(sandbox.exports.ScrollStringCoil());
+  effects.forEach((effect) => effect());
+  return {
+    scroll(delta, dt = 20) {
+      now += dt;
+      window.scrollY += delta;
+      listeners.get("scroll")();
+      const next = frame;
+      frame = undefined;
+      next?.();
+    },
+    suppress(value) {
+      suppressed = value;
+    },
+    offsets() {
+      const xs = [...paths[0].d.matchAll(/[ML] ([\d.-]+) ([\d.-]+)/g)].map((m) => Number(m[1]));
+      return xs.map((x) => x - xs[0]);
+    },
+    settle() {
+      now += 2100;
+      const next = frame;
+      frame = undefined;
+      next?.();
+      return paths[0].d;
+    },
+  };
+}
+
+const peak = (coil) => Math.max(...coil.offsets().map(Math.abs));
+
+test("real scroll/paint scales amplitude by speed, updating within one wake", () => {
+  const slow = mountCoil();
+  const fast = mountCoil();
+  // Same seed, time, gain and phase: only scroll velocity differs.
+  slow.scroll(1, 50);
+  fast.scroll(60, 50);
+  assert.ok(peak(fast) > peak(slow) * 2.5, "slow drag must be much gentler than fast flick");
+  const firstSlow = peak(slow);
+  const firstFast = peak(fast);
+  for (let i = 0; i < 12; i++) {
+    slow.scroll(60, 20);
+    fast.scroll(1, 20);
+  }
+  assert.ok(peak(slow) > peak(fast) * 2, "continuous input updates intensity without re-seeding");
+  assert.ok(firstSlow < firstFast);
+  for (const coil of [slow, fast]) {
+    assert.equal(coil.offsets()[0], 0);
+    assert.equal(coil.offsets().at(-1), 0);
+    assert.ok(peak(coil) <= motion.groupLayout(1440).amplitude + 0.01);
+    assert.match(coil.settle(), /^M [\d.]+ 0 L [\d.]+ 900$/);
+  }
+});
+
+test("suppressed route jumps reset the velocity baseline", () => {
+  const jumped = mountCoil();
+  const control = mountCoil();
+  jumped.suppress(true);
+  control.suppress(true);
+  jumped.scroll(1000);
+  control.scroll(0);
+  jumped.suppress(false);
+  control.suppress(false);
+  jumped.scroll(1);
+  control.scroll(1);
+  assert.deepEqual(jumped.offsets(), control.offsets());
+});
+
 test("snake wakes use slow travel and randomized body-scale bends", () => {
   assert.ok(motion.VIBRATE_HZ_BASE >= 1 && motion.VIBRATE_HZ_BASE <= 2.5);
   const directions = new Set();
