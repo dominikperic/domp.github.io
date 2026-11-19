@@ -47,7 +47,7 @@ function FadeDivider() {
   return (
     <span
       aria-hidden
-      className="mx-1 hidden h-10 w-px sm:block"
+      className="mx-0.5 hidden h-6 w-px sm:block"
       style={{
         background:
           "linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--accent) 55%, transparent) 35%, color-mix(in srgb, var(--foreground) 25%, transparent) 50%, color-mix(in srgb, var(--accent) 45%, transparent) 65%, transparent 100%)",
@@ -56,13 +56,17 @@ function FadeDivider() {
   );
 }
 
+/**
+ * Site-wide social bar: compact height, fixed to the bottom of the viewport
+ * on every page while scrolling.
+ */
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-border/80">
-      <div className="container-page flex justify-center py-14 sm:py-16">
+    <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/80 backdrop-blur-md">
+      <div className="container-page flex justify-center py-2.5 sm:py-3">
         <nav
           aria-label="Social"
-          className="flex flex-wrap items-center justify-center gap-y-8 sm:gap-x-2"
+          className="flex flex-wrap items-center justify-center gap-y-1 sm:gap-x-1"
         >
           {socialLinks.map((link, index) => {
             const Icon = iconByLabel[link.label];
@@ -71,11 +75,11 @@ export function SiteFooter() {
                 {index > 0 ? <FadeDivider /> : null}
                 <Link
                   href={link.href}
-                  className="group flex items-center gap-3 px-5 py-2 font-display text-lg text-muted transition-colors hover:text-accent sm:px-7 sm:text-xl"
+                  className="group flex items-center gap-2 px-3 py-1 font-display text-sm text-muted transition-colors hover:text-accent sm:px-5 sm:text-base"
                   {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 >
                   {Icon ? (
-                    <Icon className="h-5 w-5 shrink-0 text-subtle transition-colors group-hover:text-accent sm:h-6 sm:w-6" />
+                    <Icon className="h-4 w-4 shrink-0 text-subtle transition-colors group-hover:text-accent" />
                   ) : null}
                   <span>{link.label}</span>
                 </Link>

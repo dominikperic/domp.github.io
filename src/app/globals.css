@@ -134,3 +134,52 @@ a {
     transparent
   );
 }
+
+.croatia-map-antique {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: transparent;
+  /* Old-print sepia; no opaque plate behind the land */
+  filter: sepia(0.82) contrast(1.08) brightness(0.93) saturate(0.7);
+  opacity: 0.95;
+}
+
+/* Scroll Audio volume — slightly larger track + thumb */
+.scroll-audio-slider {
+  min-height: 0.5rem;
+}
+
+.scroll-audio-slider::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.scroll-audio-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-top: -0.175rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--brass) 70%, #000 30%);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  cursor: pointer;
+}
+
+.scroll-audio-slider::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.scroll-audio-slider::-moz-range-thumb {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--brass) 70%, #000 30%);
+  background: var(--accent);
+  cursor: pointer;
+}

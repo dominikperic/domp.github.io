@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CroatiaKingdomMapPlate } from "@/components/CroatiaKingdomMapPlate";
 import { FadeIn } from "@/components/ui";
 import { PageShell } from "@/components/PageShell";
 import { PortraitStrokePlate } from "@/components/PortraitStroke";
@@ -16,9 +17,12 @@ export const metadata = createMetadata({
 export default function HomePage() {
   return (
     <div id="home-stage" className="relative w-full">
+      {/* Map in the RIGHT empty gutter — sibling of the text column, not inside Identity */}
+      <CroatiaKingdomMapPlate />
       <PortraitStrokePlate />
+
       <PageShell className="pt-6 pb-12 sm:pt-8 sm:pb-16">
-        {/* One shared column; modest left bias (~28% of free space) instead of pure center */}
+        {/* Text column only */}
         <div className="mr-auto ml-[max(0rem,calc((100%-42rem)*0.28))] w-full max-w-2xl">
           <div id="home-intro">
             <FadeIn className="pt-2 pb-10 sm:pt-3 sm:pb-12">
@@ -28,7 +32,36 @@ export default function HomePage() {
 
               <div className="rule my-8 max-w-[12rem]" />
 
-              <p className="prose-muted max-w-xl text-[15px]">{siteConfig.summary}</p>
+              <div className="max-w-xl space-y-4">
+                {siteConfig.summaryParagraphs.map((paragraph, paragraphIndex) => (
+                  <p key={paragraphIndex} className="prose-muted text-[15px]">
+                    {paragraph.map((segment, segmentIndex) => {
+                      const key = `${paragraphIndex}-${segmentIndex}`;
+                      if ("bold" in segment && segment.bold) {
+                        return (
+                          <strong key={key} className="font-semibold text-foreground">
+                            {segment.text}
+                          </strong>
+                        );
+                      }
+                      if ("href" in segment && segment.href) {
+                        return (
+                          <Link
+                            key={key}
+                            href={segment.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="!font-medium !text-accent transition-colors hover:!text-brass"
+                          >
+                            {segment.text}
+                          </Link>
+                        );
+                      }
+                      return <span key={key}>{segment.text}</span>;
+                    })}
+                  </p>
+                ))}
+              </div>
             </FadeIn>
           </div>
 

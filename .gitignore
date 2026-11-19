@@ -46,3 +46,13 @@ next-env.d.ts
 .turbo
 .idea
 .vscode
+
+# Local portrait source / debug (keep published brass art only)
+public/portraits/dominik-source.png
+public/portraits/dominik-sketch-source.png
+public/portraits/dominik-edges-debug.png
+public/portraits/dominik-portrait-path.txt
+public/portraits/dominik-portrait-stroke.svg
+
+.portrait-work/
+.hermes/

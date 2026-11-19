@@ -29,7 +29,8 @@ export const metadata = createMetadata();
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} antialiased`}>
-      <body className="flex min-h-screen flex-col">
+      {/* pb clears the fixed footer so page content is never covered while scrolling */}
+      <body className="flex min-h-screen flex-col pb-14 sm:pb-16">
         <ScrollStringCoil />
         <SiteHeader />
         {children}

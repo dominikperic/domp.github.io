@@ -19,13 +19,16 @@ export function SiteHeader() {
   const volumeId = useId();
   const [open, setOpen] = useState(false);
   const [volume, setVolume] = useState(SCROLL_AUDIO_DEFAULT_VOLUME);
-  /** Center the volume control over the string column (viewport px). */
+  /** Center over the string column; width matches leftmost→rightmost string span. */
   const [audioLeft, setAudioLeft] = useState(12);
+  const [audioWidth, setAudioWidth] = useState(92);
 
   useEffect(() => {
     const place = () => {
-      const { mid } = stringGutterPlacement(window.innerWidth);
+      const { mid, groupWidth } = stringGutterPlacement(window.innerWidth);
       setAudioLeft(Math.max(8, mid));
+      // Slightly wider than the bare string span so the control reads larger, still aligned to the coil.
+      setAudioWidth(Math.round(groupWidth * 1.12));
     };
     place();
     window.addEventListener("resize", place);
@@ -46,8 +49,8 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/75 backdrop-blur-md">
       <div className="relative h-14 w-full">
         <div
-          style={{ left: audioLeft }}
-          className="absolute top-[0.55rem] z-20 flex w-[9.5rem] -translate-x-1/2 flex-col items-center gap-1 sm:w-[11rem]"
+          style={{ left: audioLeft, width: audioWidth }}
+          className="absolute top-[0.45rem] z-20 flex -translate-x-1/2 flex-col items-center"
         >
           <label
             htmlFor={volumeId}
@@ -55,6 +58,7 @@ export function SiteHeader() {
           >
             Scroll Audio
           </label>
+          {/* Extra space between title and track so the bar sits lower */}
           <input
             id={volumeId}
             type="range"
@@ -65,7 +69,7 @@ export function SiteHeader() {
             onPointerDown={() => unlockScrollAudio()}
             onChange={(e) => onVolumeChange(Number(e.target.value) / 100)}
             className={cx(
-              "scroll-audio-slider h-1.5 w-full cursor-pointer appearance-none rounded-full",
+              "scroll-audio-slider mt-2.5 h-2 w-full cursor-pointer appearance-none rounded-full",
               "bg-border accent-accent",
             )}
             aria-label="Scroll audio volume"
