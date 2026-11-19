@@ -18,35 +18,48 @@ math.random = () => {
 const context = vm.createContext({ exports: {}, require: () => ({}), Math: math });
 vm.runInContext(
   ts.transpileModule(
-    `${source}\nexports.motion = { freshBurstSeed, groupLayout, diffractionEnv, spatialRipple, buildStringPath, VIBRATE_HZ_BASE, VIBRATE_DECAY_MS, SAMPLE_COUNT, STRING_COUNT };`,
+    `${source}\nexports.motion = { freshBurstSeed, groupLayout, diffractionEnv, spatialRipple, buildStringPath, boostWavePackets, packetGain, VIBRATE_HZ_BASE, VIBRATE_DECAY_MS, SAMPLE_COUNT, STRING_COUNT };`,
     { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } },
   ).outputText,
   context,
 );
 const motion = context.exports.motion;
+const buildPath = (base, height, index, amp, gain, phase, seed, animate) =>
+  motion.buildStringPath(
+    base,
+    height,
+    index,
+    amp,
+    gain > 0
+      ? [{ seed, phase, direction: seed.direction ?? 1, intensity: gain, gainClock: 0 }]
+      : [],
+    0,
+    animate,
+  );
 const dot = (a, b) => a.reduce((sum, x, i) => sum + x * b[i], 0);
 function pathOffsets(seed, phase, index = 0) {
   return [
-    ...motion
-      .buildStringPath(100, 900, index, 50, 1, phase, seed, true)
-      .matchAll(/[ML] ([\d.-]+) ([\d.-]+)/g),
+    ...buildPath(100, 900, index, 50, 1, phase, seed, true).matchAll(/[ML] ([\d.-]+) ([\d.-]+)/g),
   ].map((m) => Number(m[1]) - 100);
 }
 
 test("scroll intensity has a gentle floor, grows with absolute speed and saturates", () => {
   const intensity = context.exports.scrollIntensity;
   assert.equal(typeof intensity, "function");
-  assert.equal(intensity(0), 0.2, "floor keeps even slow scrolls readable");
-  const speeds = [0, 25, 100, 300, 600, 1200];
+  assert.equal(intensity(0), 0.08, "slow scroll should be barely visible");
+  assert.ok(intensity(25) < 0.1);
+  assert.ok(intensity(300) < 0.3, "mid-range must be softer than the old sqrt map");
+  assert.equal(intensity(1000), 1);
+  const speeds = [0, 25, 100, 300, 600, 1000];
   const values = speeds.map(intensity);
   for (let i = 1; i < values.length; i++) {
     assert.ok(values[i] > values[i - 1]);
   }
   for (const speed of speeds) {
     assert.equal(intensity(-speed), intensity(speed));
-    assert.ok(intensity(speed) >= 0.2 && intensity(speed) <= 1);
+    assert.ok(intensity(speed) >= 0.08 && intensity(speed) <= 1);
   }
-  assert.ok(intensity(25) < 0.35);
+
   assert.equal(intensity(1200), 1);
   assert.equal(intensity(100000), 1);
 });
@@ -176,6 +189,93 @@ test("real scroll/paint scales amplitude by speed, updating within one wake", ()
   }
 });
 
+test("scroll sign controls travel and a live reversal preserves the opposite packet", () => {
+  const down = mountCoil();
+  const up = mountCoil();
+  down.scroll(60, 50);
+  up.scroll(-60, 50);
+  down.scroll(0, 50);
+  up.scroll(0, 50);
+  assert.notDeepEqual(down.offsets(), up.offsets(), "up must not repeat the down field");
+  const reversing = mountCoil();
+  const continuing = mountCoil();
+  reversing.scroll(60, 50);
+  continuing.scroll(60, 50);
+  reversing.scroll(-60, 50);
+  continuing.scroll(60, 50);
+  assert.notDeepEqual(reversing.offsets(), continuing.offsets(), "reversal changes the field");
+  assert.ok(peak(reversing) <= motion.groupLayout(1440).amplitude + 0.01);
+});
+
+test("packet reversal keeps independent clocks, reuses live seeds and respawns dead directions", () => {
+  let packets = motion.boostWavePackets([], 50, 20, 100);
+  const down = packets[0];
+  const seed = down.seed;
+  assert.equal(down.direction, 1);
+  down.phase = 0.7;
+  packets = motion.boostWavePackets(packets, -50, 20, 200);
+  assert.equal(packets.length, 2);
+  assert.equal(packets[1].direction, -1);
+  assert.equal(packets[0], down);
+  assert.equal(down.gainClock, 100);
+  assert.equal(down.phase, 0.7);
+  assert.ok(motion.packetGain(down, 200) < motion.packetGain(packets[1], 200));
+  packets = motion.boostWavePackets(packets, 50, 20, 300);
+  assert.equal(packets.length, 2);
+  assert.equal(packets[0].seed, seed);
+  assert.equal(packets[1].gainClock, 200);
+  assert.equal(down.gainClock, 300);
+  for (let i = 0; i < 100; i++) {
+    packets = motion.boostWavePackets(packets, i % 2 ? 10 : -10, 20, 320 + i * 20);
+    assert.equal(packets.length, 2, "rapid reversals cannot accumulate packets");
+  }
+  packets = motion.boostWavePackets(packets, 50, 20, 5000);
+  assert.equal(packets.length, 1);
+  assert.notEqual(packets[0].seed, seed);
+  assert.equal(motion.packetGain(packets[0], 7000), 0);
+  assert.equal(motion.boostWavePackets(packets, 0, 20, 7000).length, 0);
+});
+
+test("opposing packets interfere before saturation and never exceed the amplitude budget", () => {
+  const seed = { ...motion.freshBurstSeed(), phase: 0, harmonicWeight: 0, ampScale: 1 };
+  const down = { seed, direction: 1, phase: 0.7, intensity: 0.3, gainClock: 0 };
+  const up = { ...down, direction: -1 };
+  const offsets = (packets, now = 0) =>
+    [
+      ...motion
+        .buildStringPath(100, 900, 0, 50, packets, now, true)
+        .matchAll(/[ML] ([\d.-]+) ([\d.-]+)/g),
+    ].map((m) => Number(m[1]) - 100);
+  const a = offsets([down]);
+  const b = offsets([up]);
+  const clash = offsets([down, up]);
+  assert.notDeepEqual(clash, a);
+  assert.notDeepEqual(clash, b);
+  assert.ok(
+    clash.every((x, i) => Math.abs(x - a[i] - b[i]) < 0.02),
+    "low-amplitude clash is additive, not a field flip",
+  );
+  assert.ok(
+    clash.some((x, i) => Math.abs(x) < Math.max(Math.abs(a[i]), Math.abs(b[i])) - 1),
+    "destructive interference",
+  );
+  assert.ok(
+    clash.some((x, i) => Math.abs(x) > Math.max(Math.abs(a[i]), Math.abs(b[i])) + 1),
+    "constructive interference",
+  );
+  for (let phase = 0; phase < 10; phase += 0.1) {
+    down.phase = phase;
+    up.phase = phase * 1.2;
+    down.intensity = up.intensity = 1;
+    for (const now of [0, 200, 1000, 1999]) {
+      const field = offsets([down, up], now);
+      assert.ok(field.every((x) => Math.abs(x) <= 50.01));
+      assert.equal(field[0], 0);
+      assert.equal(field.at(-1), 0);
+    }
+  }
+});
+
 test("suppressed route jumps reset the velocity baseline", () => {
   const jumped = mountCoil();
   const control = mountCoil();
@@ -192,7 +292,6 @@ test("suppressed route jumps reset the velocity baseline", () => {
 
 test("snake wakes use slow travel and randomized body-scale bends", () => {
   assert.ok(motion.VIBRATE_HZ_BASE >= 1 && motion.VIBRATE_HZ_BASE <= 2.5);
-  const directions = new Set();
   const wavelengths = [];
   for (let i = 0; i < 500; i++) {
     const seed = motion.freshBurstSeed();
@@ -202,18 +301,16 @@ test("snake wakes use slow travel and randomized body-scale bends", () => {
     assert.ok(seed.ampScale >= 0.85 && seed.ampScale <= 1);
     assert.ok(seed.phase >= 0 && seed.phase <= Math.PI * 2);
     assert.ok(seed.harmonicPhase >= 0 && seed.harmonicPhase <= Math.PI * 2);
-    assert.ok(seed.direction === -1 || seed.direction === 1);
     assert.ok(Math.abs(seed.stringPhaseLag) <= 0.035);
-    directions.add(seed.direction);
     wavelengths.push(seed.wavelength);
   }
-  assert.equal(directions.size, 2);
+
   assert.ok(Math.max(...wavelengths) - Math.min(...wavelengths) > 0.2);
 });
 
 test("phase moves the body along Y, not a scalar flip of a frozen field", () => {
   for (let burst = 0; burst < 30; burst++) {
-    const seed = motion.freshBurstSeed();
+    const seed = { ...motion.freshBurstSeed(), direction: burst % 2 ? 1 : -1 };
     const start = pathOffsets(seed, 0);
     const delta = Math.PI / 2;
     const next = pathOffsets(seed, delta);
@@ -225,8 +322,8 @@ test("phase moves the body along Y, not a scalar flip of a frozen field", () => 
     // Removing the fixed envelope, the entire body must translate coherently.
     const shift = (seed.direction * delta * seed.wavelength) / (Math.PI * 2);
     for (const y of [0.3, 0.5, 0.7]) {
-      const later = motion.spatialRipple(y + shift, 1, 0, seed, delta);
-      const earlier = motion.spatialRipple(y, 1, 0, seed, 0);
+      const later = motion.spatialRipple(y + shift, 1, 0, seed, delta, seed.direction);
+      const earlier = motion.spatialRipple(y, 1, 0, seed, 0, seed.direction);
       assert.ok(Math.abs(later - earlier) < 1e-12);
     }
     const offsets = start.filter((x, i) => i > start.length * 0.1 && i < start.length * 0.9);
@@ -293,7 +390,7 @@ test("six strings preserve amplitude/layout budget, spacing and static fallback"
       const paths = [];
       for (let index = 0; index < 6; index++) {
         const base = layout.sidePad + (index / 5) * groupWidth;
-        const path = motion.buildStringPath(base, 900, index, layout.amplitude, 1, 1, seed, true);
+        const path = buildPath(base, 900, index, layout.amplitude, 1, 1, seed, true);
         const points = [...path.matchAll(/[ML] ([\d.-]+) ([\d.-]+)/g)].map((m) => Number(m[1]));
         paths.push(points);
         assert.ok(Math.abs(points[0] - base) <= 0.01);
@@ -304,7 +401,7 @@ test("six strings preserve amplitude/layout budget, spacing and static fallback"
           [0, true],
         ]) {
           assert.equal(
-            motion.buildStringPath(base, 900, index, layout.amplitude, gain, 1, seed, animate),
+            buildPath(base, 900, index, layout.amplitude, gain, 1, seed, animate),
             `M ${base} 0 L ${base} 900`,
           );
         }

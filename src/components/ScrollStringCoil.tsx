@@ -24,13 +24,13 @@ const VIBRATE_HZ_BASE = 1.5;
  * gain = (e^{-k u} - e^{-k}) / (1 - e^{-k}) with u = elapsed/T ∈ [0,1].
  */
 const DECAY_K = 4.2;
-/** Full swing at 1200 px/s; slow movement retains a gentle 20% hint. */
-const SCROLL_SPEED_REF = 1200;
-const MIN_SCROLL_INTENSITY = 0.2;
+/** Convex response: barely visible slow drags, full swing at 1000 px/s. */
+const SCROLL_SPEED_REF = 1000;
+const MIN_SCROLL_INTENSITY = 0.08;
 
 export function scrollIntensity(velocityPxPerSec: number): number {
   const speed = Math.min(1, Math.abs(velocityPxPerSec) / SCROLL_SPEED_REF);
-  return MIN_SCROLL_INTENSITY + (1 - MIN_SCROLL_INTENSITY) * Math.sqrt(speed);
+  return MIN_SCROLL_INTENSITY + (1 - MIN_SCROLL_INTENSITY) * speed ** 1.6;
 }
 
 function rand(min: number, max: number) {
@@ -44,7 +44,6 @@ type BurstSeed = {
   phase: number;
   harmonicPhase: number;
   harmonicWeight: number;
-  direction: -1 | 1;
   /** Small shared phase step keeps neighboring strings parallel, never a helix. */
   stringPhaseLag: number;
   ampScale: number;
@@ -57,11 +56,47 @@ function freshBurstSeed(): BurstSeed {
     phase: rand(0, Math.PI * 2),
     harmonicPhase: rand(0, Math.PI * 2),
     harmonicWeight: rand(0.15, 0.35),
-    direction: Math.random() < 0.5 ? -1 : 1,
     stringPhaseLag: rand(-0.035, 0.035),
     ampScale: rand(0.85, 1),
     hzScale: rand(0.7, 1.3),
   };
+}
+
+type WavePacket = {
+  seed: BurstSeed;
+  /** Positive Y is down the screen, matching positive scroll delta. */
+  direction: -1 | 1;
+  phase: number;
+  intensity: number;
+  gainClock: number;
+};
+
+function packetGain(packet: WavePacket, now: number): number {
+  const u = Math.max(0, (now - packet.gainClock) / VIBRATE_DECAY_MS);
+  if (u >= 1) return 0;
+  const expK = Math.exp(-DECAY_K);
+  return (Math.exp(-DECAY_K * u) - expK) / (1 - expK);
+}
+
+/** At most one live packet per direction; reversing never resets the other clock. */
+function boostWavePackets(
+  packets: WavePacket[],
+  delta: number,
+  dt: number,
+  now: number,
+): WavePacket[] {
+  const alive = packets.filter((packet) => packetGain(packet, now) > 0);
+  if (Math.abs(delta) < 0.01) return alive;
+  const direction = delta > 0 ? 1 : -1;
+  const target = scrollIntensity((delta * 1000) / dt);
+  const packet = alive.find((wave) => wave.direction === direction);
+  if (packet) {
+    packet.intensity += (target - packet.intensity) * (1 - Math.exp(-dt / 80));
+    packet.gainClock = now;
+  } else {
+    alive.push({ seed: freshBurstSeed(), direction, phase: 0, intensity: target, gainClock: now });
+  }
+  return alive;
 }
 
 /** Page content column left edge (matches .container-page). */
@@ -114,11 +149,12 @@ function spatialRipple(
   stringIndex: number,
   seed: BurstSeed,
   phase = 0,
+  direction: -1 | 1 = 1,
 ): number {
   const k = (Math.PI * 2) / (height * seed.wavelength);
   const bodyPhase =
     k * y -
-    seed.direction * phase +
+    direction * phase +
     seed.phase +
     (stringIndex - (STRING_COUNT - 1) / 2) * seed.stringPhaseLag;
   // Both modes translate at the SAME speed: the body crawls intact along Y.
@@ -130,33 +166,45 @@ function spatialRipple(
 }
 
 /**
- * x = baseX + sin(πt)² * amp * gain * travelingRipple(y, phase, seed)
- * Every sine has zero temporal mean, so the body stays centered on baseX.
- * gain shrinks the swing to straight over 2s after scroll stops.
+ * Sum independent traveling packets before a smooth bounded saturation.
+ * The envelope is applied last, preserving exact flat viewport ends.
  */
 function buildStringPath(
   baseX: number,
   height: number,
   stringIndex: number,
   amplitude: number,
-  gain: number,
-  phase: number,
-  seed: BurstSeed,
+  packets: WavePacket[],
+  now: number,
   animate: boolean,
 ): string {
-  if (!animate || height <= 0 || gain <= 0) {
+  const active = packets.filter((packet) => packetGain(packet, now) > 0);
+  if (!animate || height <= 0 || active.length === 0) {
     return `M ${baseX} 0 L ${baseX} ${height}`;
   }
-
-  const amp = amplitude * gain * seed.ampScale;
 
   let d = "";
   for (let i = 0; i <= SAMPLE_COUNT; i++) {
     const t = i / SAMPLE_COUNT;
     const y = t * height;
     const env = diffractionEnv(t);
-    const spatial = spatialRipple(y, height, stringIndex, seed, phase);
-    const x = baseX + env * amp * spatial;
+    const sum = active.reduce((value, packet) => {
+      const ripple = spatialRipple(
+        y,
+        height,
+        stringIndex,
+        packet.seed,
+        packet.phase,
+        packet.direction,
+      );
+      return value + packetGain(packet, now) * packet.intensity * packet.seed.ampScale * ripple;
+    }, 0);
+    // Linear through 80% of the budget; smooth, odd soft-limit near the ceiling.
+    // Unlike dividing by packet count, a tiny dying packet cannot halve the new wave.
+    const magnitude = Math.abs(sum);
+    const bounded =
+      magnitude <= 0.8 ? sum : Math.sign(sum) * (0.8 + 0.2 * Math.tanh((magnitude - 0.8) / 0.2));
+    const x = baseX + env * amplitude * bounded;
     d += i === 0 ? `M ${x.toFixed(2)} ${y.toFixed(2)}` : ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
   }
   return d;
@@ -164,8 +212,8 @@ function buildStringPath(
 
 /**
  * Left-gutter guitar strings: centered traveling bends with flat viewport ends.
- * Each scroll wake picks a new random burst seed (shape + timing noise).
- * After scroll stops, swing amplitude dies to straight over VIBRATE_DECAY_MS.
+ * Each direction has its own random shape, traveling phase and release clock.
+ * Reversals add an opposing wave; all packets die to straight over VIBRATE_DECAY_MS.
  */
 export function ScrollStringCoil() {
   const pathname = usePathname();
@@ -173,18 +221,12 @@ export function ScrollStringCoil() {
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRefs = useRef<(SVGPathElement | null)[]>([]);
   const loopIdRef = useRef<number | null>(null);
-  /** performance.now() of last scroll — starts the 2s decay clock. */
-  const lastScrollTimeRef = useRef(0);
+  const packetsRef = useRef<WavePacket[]>([]);
   /** Velocity baseline is separate from the vibration release clock. */
   const lastScrollYRef = useRef(0);
   const lastScrollTsRef = useRef(0);
-  const intensityRef = useRef(MIN_SCROLL_INTENSITY);
-  /** Radians; advances every frame while gain > 0. */
-  const oscPhaseRef = useRef(0);
   const lastFrameTimeRef = useRef(0);
   const reduceRef = useRef(false);
-  /** Random recipe for the active vibration burst. */
-  const seedRef = useRef<BurstSeed>(freshBurstSeed());
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -194,20 +236,6 @@ export function ScrollStringCoil() {
         window.cancelAnimationFrame(loopIdRef.current);
         loopIdRef.current = null;
       }
-    };
-
-    /**
-     * Swing amplitude: full while scrolling; after stop, exponential fall to 0 by 2s.
-     * Not linear — steep early drop like a plucked string ringing out.
-     */
-    const vibrateGain = (now: number): number => {
-      const elapsed = now - lastScrollTimeRef.current;
-      if (elapsed <= 0) return 1;
-      if (elapsed >= VIBRATE_DECAY_MS) return 0;
-      const u = elapsed / VIBRATE_DECAY_MS;
-      const expK = Math.exp(-DECAY_K);
-      const gain = (Math.exp(-DECAY_K * u) - expK) / (1 - expK);
-      return Math.max(0, Math.min(1, gain));
     };
 
     const paint = (): boolean => {
@@ -220,21 +248,16 @@ export function ScrollStringCoil() {
       const viewportWidth = window.innerWidth;
       const { left, groupWidth, amplitude, sidePad, svgWidth } = groupLayout(viewportWidth);
       const animate = !reduceRef.current;
-      const gain = animate ? vibrateGain(now) : 0;
-      const seed = seedRef.current;
-
-      // Advance oscillator only while still swinging (gain > 0).
-      if (animate && gain > 0) {
-        const last = lastFrameTimeRef.current || now;
-        const dt = Math.min(0.05, (now - last) / 1000);
-        lastFrameTimeRef.current = now;
-        const hz = VIBRATE_HZ_BASE * seed.hzScale;
-        oscPhaseRef.current += dt * hz * Math.PI * 2;
-      } else {
-        lastFrameTimeRef.current = now;
+      const packets = animate
+        ? packetsRef.current.filter((packet) => packetGain(packet, now) > 0)
+        : [];
+      packetsRef.current = packets;
+      const dt = Math.min(0.05, (now - (lastFrameTimeRef.current || now)) / 1000);
+      lastFrameTimeRef.current = now;
+      for (const packet of packets) {
+        packet.phase += dt * VIBRATE_HZ_BASE * packet.seed.hzScale * Math.PI * 2;
       }
-
-      const settled = !animate || gain <= 0;
+      const settled = packets.length === 0;
 
       wrap.style.left = `${left}px`;
       wrap.style.width = `${svgWidth}px`;
@@ -249,16 +272,7 @@ export function ScrollStringCoil() {
         const baseX = sidePad + slot * groupWidth;
         path.setAttribute(
           "d",
-          buildStringPath(
-            baseX,
-            height,
-            index,
-            amplitude,
-            gain * intensityRef.current,
-            oscPhaseRef.current,
-            seed,
-            animate,
-          ),
+          buildStringPath(baseX, height, index, amplitude, packets, now, animate),
         );
       }
 
@@ -292,27 +306,14 @@ export function ScrollStringCoil() {
 
       // Ignore scroll jumps from App Router page swaps.
       if (isScrollFxSuppressed()) {
-        lastScrollTimeRef.current = performance.now() - VIBRATE_DECAY_MS - 1;
+        packetsRef.current = [];
         paint();
         return;
       }
 
-      const wasResting = vibrateGain(now) <= 0.05;
-      const velocity = Math.min(SCROLL_SPEED_REF, (Math.abs(delta) * 1000) / dt);
-      const targetIntensity = scrollIntensity(velocity);
-      // Time-based EMA (80ms) avoids trackpad jitter without changing snake speed.
-      intensityRef.current = wasResting
-        ? targetIntensity
-        : intensityRef.current +
-          (targetIntensity - intensityRef.current) * (1 - Math.exp(-dt / 80));
-      // Reset decay clock → full gain, with swing strength set by scroll speed.
-      lastScrollTimeRef.current = now;
-      // New random shape + timing each time vibration wakes from rest.
-      if (wasResting) {
-        seedRef.current = freshBurstSeed();
-        oscPhaseRef.current = 0;
-        lastFrameTimeRef.current = now;
-      }
+      if (Math.abs(delta) < 0.01) return;
+      if (loopIdRef.current == null) lastFrameTimeRef.current = now;
+      packetsRef.current = boostWavePackets(packetsRef.current, delta, dt, now);
       notifyScrollAudio();
       ensureLoop();
     };
@@ -320,7 +321,7 @@ export function ScrollStringCoil() {
     const syncReduce = () => {
       reduceRef.current = media.matches;
       if (media.matches) {
-        lastScrollTimeRef.current = 0;
+        packetsRef.current = [];
         stopLoop();
         paint();
       }
@@ -328,7 +329,7 @@ export function ScrollStringCoil() {
 
     const onResize = () => {
       paint();
-      if (vibrateGain(performance.now()) > 0 && !reduceRef.current) {
+      if (packetsRef.current.length > 0 && !reduceRef.current) {
         ensureLoop();
       }
     };
@@ -337,7 +338,7 @@ export function ScrollStringCoil() {
     media.addEventListener("change", syncReduce);
 
     // Rest until first scroll.
-    lastScrollTimeRef.current = performance.now() - VIBRATE_DECAY_MS - 1;
+    packetsRef.current = [];
     lastFrameTimeRef.current = performance.now();
     lastScrollYRef.current = window.scrollY;
     lastScrollTsRef.current = performance.now();
@@ -358,7 +359,7 @@ export function ScrollStringCoil() {
   // On App Router navigations: suppress FX and kill any in-flight vibration/audio.
   useEffect(() => {
     markAppRouteChange();
-    lastScrollTimeRef.current = performance.now() - VIBRATE_DECAY_MS - 1;
+    packetsRef.current = [];
     lastScrollYRef.current = window.scrollY;
     lastScrollTsRef.current = performance.now();
     resetScrollAudioBaseline();
