@@ -109,7 +109,7 @@ export const identityContent = {
 export const navigation: NavItem[] = [
   { label: "Home", href: "/" },
   { label: "Projects", href: "/projects" },
-  { label: "Building", href: "/building" },
+  { label: "Resume", href: "/resume" },
   { label: "Interests", href: "/interests" },
   { label: "Contact", href: "/contact" },
 ];
